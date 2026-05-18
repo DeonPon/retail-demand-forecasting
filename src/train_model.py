@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.ensemble import ExtraTreesRegressor, GradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-from data_processing import DEFAULT_DATA_PATH, get_product_catalog, load_sales_data
+from data_processing import DEFAULT_DATA_PATH, load_sales_data
 from database import initialize_database, save_model_metrics
 from feature_engineering import FEATURE_COLUMNS, prepare_training_data
 from generate_dataset import generate_sales_dataset
@@ -62,13 +62,13 @@ def train_model() -> dict:
 
     candidate_models = {
         "RandomForestRegressor": RandomForestRegressor(
-            n_estimators=180, max_depth=16, min_samples_leaf=2, random_state=42, n_jobs=1
+            n_estimators=40, max_depth=10, min_samples_leaf=2, random_state=42, n_jobs=1
         ),
         "GradientBoostingRegressor": GradientBoostingRegressor(
-            random_state=42, n_estimators=180, learning_rate=0.06, max_depth=3
+            random_state=42, n_estimators=80, learning_rate=0.06, max_depth=3
         ),
         "ExtraTreesRegressor": ExtraTreesRegressor(
-            n_estimators=220, max_depth=18, min_samples_leaf=2, random_state=42, n_jobs=1
+            n_estimators=50, max_depth=12, min_samples_leaf=2, random_state=42, n_jobs=1
         ),
     }
 
@@ -110,13 +110,12 @@ def train_model() -> dict:
         "model": best_model,
         "feature_columns": FEATURE_COLUMNS,
         "category_mapping": category_mapping,
-        "products": get_product_catalog(DEFAULT_DATA_PATH).to_dict("records"),
         "last_date": str(raw_data["date"].max().date()),
         "metrics": metrics_payload,
     }
 
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(artifact, MODEL_PATH)
+    joblib.dump(artifact, MODEL_PATH, compress=("xz", 3))
     METRICS_PATH.write_text(json.dumps(metrics_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     save_model_metrics(metrics_payload)
     return metrics_payload

@@ -38,11 +38,14 @@ def build_category_mapping(data: pd.DataFrame) -> dict[str, int]:
 
 def add_calendar_features(data: pd.DataFrame) -> pd.DataFrame:
     result = data.copy()
-    result["day_of_week"] = result["date"].dt.dayofweek
-    result["month"] = result["date"].dt.month
-    result["day_of_month"] = result["date"].dt.day
-    result["quarter"] = result["date"].dt.quarter
-    result["is_weekend"] = (result["day_of_week"] >= 5).astype(int)
+    date_series = pd.to_datetime(result["date"], errors="coerce")
+    day_of_week = date_series.dt.dayofweek.fillna(0).astype(int)
+    result["date"] = date_series
+    result["day_of_week"] = day_of_week
+    result["month"] = date_series.dt.month.fillna(1).astype(int)
+    result["day_of_month"] = date_series.dt.day.fillna(1).astype(int)
+    result["quarter"] = date_series.dt.quarter.fillna(1).astype(int)
+    result["is_weekend"] = day_of_week.isin([5, 6]).astype(int)
     return result
 
 
@@ -72,6 +75,14 @@ def add_lag_features(data: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def ensure_feature_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    result = frame.copy()
+    for column in FEATURE_COLUMNS:
+        if column not in result.columns:
+            result[column] = 0
+    return result[FEATURE_COLUMNS]
+
+
 def prepare_training_data(
     data: pd.DataFrame,
     category_mapping: dict[str, int] | None = None,
@@ -81,6 +92,7 @@ def prepare_training_data(
     prepared = prepared.replace([np.inf, -np.inf], np.nan)
     prepared["rolling_std_7"] = prepared["rolling_std_7"].fillna(0)
     prepared = prepared.dropna(subset=FEATURE_COLUMNS + ["sales_quantity"]).reset_index(drop=True)
+    prepared = prepared.assign(is_weekend=prepared["is_weekend"].fillna(0).astype(int))
     return prepared, mapping
 
 
@@ -93,38 +105,38 @@ def build_future_feature_row(
     promo_history: list[int],
     category_mapping: dict[str, int],
 ) -> pd.DataFrame:
-    history_mean_7 = float(pd.Series(sales_history[-7:]).mean())
-    history_mean_14 = float(pd.Series(sales_history[-14:]).mean())
+    date_value = pd.Timestamp(forecast_date)
+    day_of_week = int(date_value.dayofweek)
     last_price = float(price_history[-1])
     prev_price = float(price_history[-2] if len(price_history) >= 2 else price_history[-1])
-    current_price_change = ((last_price - prev_price) / prev_price) if prev_price else 0.0
+    base_demand = max(float(row["base_demand"]), 1.0)
+    rolling_mean_7 = float(np.mean(sales_history[-7:]))
+    rolling_mean_14 = float(np.mean(sales_history[-14:]))
+    rolling_std_7 = float(np.std(sales_history[-7:], ddof=1)) if len(sales_history[-7:]) > 1 else 0.0
 
-    future_row = pd.DataFrame(
-        [
-            {
-                "date": forecast_date,
-                "product_id": int(row["product_id"]),
-                "product_name": row["product_name"],
-                "category": row["category"],
-                "base_demand": float(row["base_demand"]),
-                "price": last_price,
-                "stock_quantity": float(row["stock_quantity"]),
-                "supplier_delay_days": float(row["supplier_delay_days"]),
-                "promo": 0,
-                "holiday": 0,
-                "sales_quantity": 0,
-            }
-        ]
-    )
-    future_row = add_category_feature(add_calendar_features(future_row), category_mapping)
-    future_row["lag_1"] = sales_history[-1]
-    future_row["lag_7"] = sales_history[-7]
-    future_row["lag_14"] = sales_history[-14]
-    future_row["rolling_mean_7"] = history_mean_7
-    future_row["rolling_mean_14"] = history_mean_14
-    future_row["rolling_std_7"] = float(pd.Series(sales_history[-7:]).std() or 0)
-    future_row["price_change"] = current_price_change
-    future_row["promo_last_7_days"] = int(sum(promo_history[-7:]))
-    future_row["stock_ratio"] = float(row["stock_quantity"]) / max(float(row["base_demand"]), 1.0)
-    future_row["trend_7"] = history_mean_7 - history_mean_14
-    return future_row
+    feature_values = {
+        "product_id": int(row["product_id"]),
+        "category_encoded": int(category_mapping.get(str(row["category"]), -1)),
+        "base_demand": float(row["base_demand"]),
+        "price": last_price,
+        "stock_quantity": float(row["stock_quantity"]),
+        "supplier_delay_days": float(row["supplier_delay_days"]),
+        "promo": 0,
+        "holiday": 0,
+        "day_of_week": day_of_week,
+        "month": int(date_value.month),
+        "day_of_month": int(date_value.day),
+        "is_weekend": 1 if day_of_week >= 5 else 0,
+        "quarter": int(date_value.quarter),
+        "lag_1": float(sales_history[-1]),
+        "lag_7": float(sales_history[-7] if len(sales_history) >= 7 else sales_history[-1]),
+        "lag_14": float(sales_history[-14] if len(sales_history) >= 14 else sales_history[-1]),
+        "rolling_mean_7": rolling_mean_7,
+        "rolling_mean_14": rolling_mean_14,
+        "rolling_std_7": rolling_std_7,
+        "price_change": ((last_price - prev_price) / prev_price) if prev_price else 0.0,
+        "promo_last_7_days": int(sum(promo_history[-7:])),
+        "stock_ratio": float(row["stock_quantity"]) / base_demand,
+        "trend_7": rolling_mean_7 - rolling_mean_14,
+    }
+    return ensure_feature_columns(pd.DataFrame([feature_values]))

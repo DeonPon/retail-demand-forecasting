@@ -1,71 +1,71 @@
 {
-  "MAE": 2.005,
-  "RMSE": 3.194,
-  "MAPE": 12.793,
+  "MAE": 2.065,
+  "RMSE": 3.291,
+  "MAPE": 13.154,
   "best_model_name": "ExtraTreesRegressor",
   "train_rows": 20794,
   "test_rows": 5180,
-  "last_training_at": "2026-05-18T12:03:17.064781+00:00",
+  "last_training_at": "2026-05-18T13:08:01.738030+00:00",
   "feature_importance": [
     {
       "feature": "lag_7",
-      "importance": 0.23369
+      "importance": 0.22317
     },
     {
       "feature": "rolling_mean_14",
-      "importance": 0.18163
-    },
-    {
-      "feature": "lag_14",
-      "importance": 0.17737
+      "importance": 0.19416
     },
     {
       "feature": "rolling_mean_7",
-      "importance": 0.16791
+      "importance": 0.18983
     },
     {
-      "feature": "lag_1",
-      "importance": 0.0626
+      "feature": "lag_14",
+      "importance": 0.18169
     },
     {
       "feature": "base_demand",
-      "importance": 0.06038
+      "importance": 0.06699
+    },
+    {
+      "feature": "lag_1",
+      "importance": 0.0506
     },
     {
       "feature": "promo",
-      "importance": 0.02125
+      "importance": 0.02183
     },
     {
       "feature": "is_weekend",
-      "importance": 0.01217
+      "importance": 0.01272
     },
     {
       "feature": "supplier_delay_days",
-      "importance": 0.01051
+      "importance": 0.0081
     },
     {
-      "feature": "rolling_std_7",
-      "importance": 0.00806
+      "feature": "day_of_week",
+      "importance": 0.00674
     }
   ],
   "model_comparison": [
     {
       "model": "RandomForestRegressor",
-      "MAE": 2.057,
-      "RMSE": 3.287,
-      "MAPE": 12.949
+      "MAE": 2.159,
+      "RMSE": 3.413,
+      "MAPE": 13.431
     },
     {
       "model": "GradientBoostingRegressor",
-      "MAE": 2.111,
-      "RMSE": 3.273,
-      "MAPE": 13.253
+      "MAE": 2.225,
+      "RMSE": 3.463,
+      "MAPE": 14.055
     },
     {
       "model": "ExtraTreesRegressor",
-      "MAE": 2.005,
-      "RMSE": 3.194,
-      "MAPE": 12.793
+      "MAE": 2.065,
+      "RMSE": 3.291,
+      "MAPE": 13.154
     }
   ]
 }

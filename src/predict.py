@@ -83,7 +83,7 @@ def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
     model = artifact["model"]
     category_mapping = artifact["category_mapping"]
     data = load_sales_data(DEFAULT_DATA_PATH)
-    product_data = data[data["product_id"] == product_id].sort_values("date").copy()
+    product_data = data[data["product_id"] == product_id].sort_values("date").tail(60).copy()
 
     if product_data.empty:
         raise ProductNotFoundError("Товар не знайдено.")
@@ -110,8 +110,14 @@ def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
         )
         predicted = max(0.0, float(model.predict(future_row[FEATURE_COLUMNS])[0]))
         sales_history.append(predicted)
+        if len(sales_history) > 60:
+            sales_history.pop(0)
         price_history.append(float(latest["price"]))
+        if len(price_history) > 60:
+            price_history.pop(0)
         promo_history.append(0)
+        if len(promo_history) > 60:
+            promo_history.pop(0)
         current_stock = max(0.0, current_stock - predicted)
         forecast_rows.append({"date": forecast_date.date().isoformat(), "predicted_quantity": round(predicted, 2)})
 

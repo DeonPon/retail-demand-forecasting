@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import secrets
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -17,35 +19,10 @@ sys.path.append(str(ROOT_DIR / "app" / "auth"))
 
 from auth import authenticate, login_required
 from catalog import get_category_names
-from data_processing import (
-    DEFAULT_DATA_PATH,
-    REQUIRED_COLUMNS,
-    clear_data_cache,
-    get_product_catalog,
-    load_sales_data,
-    save_uploaded_dataset,
-)
-from database import (
-    DATABASE_PATH,
-    get_import_history,
-    get_product_detail,
-    get_system_overview,
-    import_sales_dataframe,
-    initialize_database,
-    log_import,
-)
+from data_processing import DEFAULT_DATA_PATH, REQUIRED_COLUMNS, clear_data_cache, get_product_catalog, load_sales_data, save_uploaded_dataset
+from database import DATABASE_PATH, get_import_history, get_product_detail, get_system_overview, import_sales_dataframe, initialize_database, log_import
 from generate_dataset import main as generate_dataset
-from predict import (
-    METRICS_PATH,
-    MODEL_PATH,
-    ModelNotTrainedError,
-    NotEnoughDataError,
-    ProductNotFoundError,
-    clear_model_cache,
-    forecast_product,
-    get_metrics,
-    get_products,
-)
+from predict import METRICS_PATH, MODEL_PATH, ModelNotTrainedError, NotEnoughDataError, ProductNotFoundError, clear_model_cache, forecast_product, get_metrics, get_products
 from recommendations import clear_recommendations_cache, exportable_recommendations, list_recommendations, purchase_recommendation
 from train_model import train_model
 
@@ -54,11 +31,53 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
     initialize_database(seed=DEFAULT_DATA_PATH.exists())
+    app.logger.setLevel(logging.INFO)
 
     def reset_runtime_caches() -> None:
         clear_data_cache()
         clear_model_cache()
         clear_recommendations_cache()
+        build_dashboard_summary.cache_clear()
+
+    @lru_cache(maxsize=8)
+    def build_dashboard_summary(days: int = 14) -> dict:
+        history = load_sales_data(DEFAULT_DATA_PATH)
+        catalog = get_product_catalog(DEFAULT_DATA_PATH)
+        recent = history.groupby("product_id").tail(14)
+        avg_7_map = history.groupby("product_id").tail(7).groupby("product_id")["sales_quantity"].mean().to_dict()
+        avg_14 = recent.groupby("product_id")["sales_quantity"].mean().to_dict()
+
+        items = []
+        for row in catalog.to_dict("records"):
+            avg7 = float(avg_7_map.get(row["product_id"], 0))
+            avg14 = float(avg_14.get(row["product_id"], avg7))
+            simple_forecast = round(avg14 * days, 2)
+            recommended = max(0, round(simple_forecast + avg7 * 3 - float(row["stock_quantity"])))
+            cover_days = round(float(row["stock_quantity"]) / max(avg7, 1), 1)
+            priority = "високий" if recommended > 0 and cover_days < 5 else "середній" if recommended > 0 and cover_days < 10 else "низький"
+            items.append(
+                {
+                    "product_id": int(row["product_id"]),
+                    "product_name": row["product_name"],
+                    "product_icon": row.get("product_icon", "📦"),
+                    "current_stock": round(float(row["stock_quantity"]), 2),
+                    "forecast_total": simple_forecast,
+                    "recommended_order_quantity": int(recommended),
+                    "stock_cover_days": cover_days,
+                    "priority": priority,
+                }
+            )
+
+        top_to_buy = sorted([item for item in items if item["recommended_order_quantity"] > 0], key=lambda item: -item["recommended_order_quantity"])[:10]
+        risk_items = sorted(items, key=lambda item: item["stock_cover_days"])[:10]
+        average_forecast = round(sum(item["forecast_total"] for item in items) / max(len(items), 1), 2)
+        return {
+            "items": items,
+            "top_to_buy": top_to_buy,
+            "risk_items": risk_items,
+            "average_forecast": average_forecast,
+            "products_to_order": sum(1 for item in items if item["recommended_order_quantity"] > 0),
+        }
 
     def set_notice(message: str, level: str = "info") -> None:
         session["notice"] = {"message": message, "level": level}
@@ -66,47 +85,71 @@ def create_app() -> Flask:
     def pop_notice() -> dict | None:
         return session.pop("notice", None)
 
+    def build_json_error(message: str, status_code: int):
+        return jsonify({"status": "error", "message": message}), status_code
+
+    def empty_forecast(product_id: int, product_name: str = "Товар") -> dict:
+        return {
+            "product_id": product_id,
+            "product_name": product_name,
+            "category": "",
+            "forecast_days": 14,
+            "forecast": [],
+            "forecast_total": 0,
+            "forecast_min": 0,
+            "forecast_max": 0,
+            "forecast_avg": 0,
+            "trend": "недоступний",
+            "factors": [],
+            "plain_explanation": "Прогноз тимчасово недоступний, перевірте модель або дані.",
+            "feature_importance": [],
+        }
+
     def build_dashboard_context(selected_product: int, days: int = 14) -> dict:
         products = get_products()
-        recommendations = list_recommendations(days=days)
         product_ids = {product["product_id"] for product in products}
         if selected_product not in product_ids and products:
             selected_product = int(products[0]["product_id"])
-        forecast = forecast_product(selected_product, days=days, persist=False)
-        recommendation = purchase_recommendation(selected_product, days=days, persist_forecast=False)
+
         metrics = get_metrics()
         overview = get_system_overview()
         imports = get_import_history(limit=5)
-        top_to_buy = [item for item in recommendations if item["recommended_order_quantity"] > 0][:8]
-        risk_items = [item for item in recommendations if item["stock_cover_days"] < 6][:8]
-        feature_importance = metrics.get("feature_importance", [])
+        summary = build_dashboard_summary(days=days)
+        forecast_error = None
+        recommendation = None
+
+        try:
+            forecast = forecast_product(selected_product, days=days, persist=False)
+            recommendation = purchase_recommendation(selected_product, days=days, persist_forecast=False)
+        except Exception as exc:
+            app.logger.exception("Помилка побудови прогнозу для dashboard")
+            selected_name = next((product["product_name"] for product in products if product["product_id"] == selected_product), "Товар")
+            forecast = empty_forecast(selected_product, selected_name)
+            forecast_error = "Прогноз тимчасово недоступний, перевірте модель або дані."
+
         status_cards = [
             {"label": "Модель", "ok": MODEL_PATH.exists()},
             {"label": "Метрики", "ok": METRICS_PATH.exists()},
             {"label": "Дані", "ok": DEFAULT_DATA_PATH.exists()},
             {"label": "База даних", "ok": DATABASE_PATH.exists()},
         ]
-        average_forecast = round(sum(item["forecast_total"] for item in recommendations) / max(len(recommendations), 1), 2)
         return {
             "products": products,
             "selected_product": selected_product,
             "forecast": forecast,
+            "forecast_error": forecast_error,
             "recommendation": recommendation,
-            "recommendations": recommendations,
             "metrics": metrics,
             "overview": overview,
             "imports": imports,
-            "top_to_buy": top_to_buy,
-            "risk_items": risk_items,
-            "feature_importance": feature_importance,
-            "average_forecast": average_forecast,
-            "products_to_order": sum(1 for item in recommendations if item["recommended_order_quantity"] > 0),
+            "top_to_buy": summary["top_to_buy"],
+            "risk_items": summary["risk_items"],
+            "feature_importance": metrics.get("feature_importance", []),
+            "average_forecast": summary["average_forecast"],
+            "products_to_order": summary["products_to_order"],
             "status_cards": status_cards,
             "notice": pop_notice(),
         }
-
-    def build_json_error(message: str, status_code: int):
-        return jsonify({"status": "error", "message": message}), status_code
 
     @app.errorhandler(ModelNotTrainedError)
     def handle_model_error(error):
@@ -123,6 +166,13 @@ def create_app() -> Flask:
     @app.errorhandler(ValueError)
     def handle_value_error(error):
         return build_json_error(str(error), 400)
+
+    @app.errorhandler(500)
+    def handle_internal_error(error):
+        app.logger.exception("Внутрішня помилка сервера: %s", error)
+        if request.path.startswith("/api/") or request.path == "/health":
+            return build_json_error("Внутрішня помилка сервера. Спробуйте ще раз пізніше.", 500)
+        return render_template("error.html", title="Помилка сервера", message="Сталася внутрішня помилка. Спробуйте оновити сторінку або перевірити модель і дані."), 500
 
     @app.route("/favicon.svg")
     def favicon():
@@ -211,14 +261,7 @@ def create_app() -> Flask:
         days = int(request.args.get("days", 14))
         selected_product = int(request.args.get("product_id", products[0]["product_id"] if products else 1))
         forecast = forecast_product(selected_product, days=days, persist=False)
-        return render_template(
-            "forecast.html",
-            products=products,
-            selected_product=selected_product,
-            days=days,
-            forecast=forecast,
-            metrics=get_metrics(),
-        )
+        return render_template("forecast.html", products=products, selected_product=selected_product, days=days, forecast=forecast, metrics=get_metrics())
 
     @app.route("/recommendations")
     @login_required
@@ -279,12 +322,12 @@ def create_app() -> Flask:
     @app.route("/api/forecast/<int:product_id>")
     def api_forecast(product_id: int):
         days = int(request.args.get("days", 14))
-        return jsonify({"status": "success", "data": forecast_product(product_id, days=days, persist=True)})
+        return jsonify({"status": "success", "data": forecast_product(product_id, days=days, persist=False)})
 
     @app.route("/api/recommendation/<int:product_id>")
     def api_recommendation(product_id: int):
         days = int(request.args.get("days", 14))
-        return jsonify({"status": "success", "data": purchase_recommendation(product_id, days=days, persist_forecast=True)})
+        return jsonify({"status": "success", "data": purchase_recommendation(product_id, days=days, persist_forecast=False)})
 
     @app.route("/api/recommendations")
     def api_recommendations():
@@ -297,8 +340,7 @@ def create_app() -> Flask:
 
     @app.route("/api/feature-importance")
     def api_feature_importance():
-        metrics = get_metrics()
-        return jsonify({"status": "success", "data": metrics.get("feature_importance", [])})
+        return jsonify({"status": "success", "data": get_metrics().get("feature_importance", [])})
 
     @app.route("/api/imports")
     def api_imports():
@@ -331,16 +373,7 @@ def create_app() -> Flask:
     @app.route("/api/system-info")
     def api_system_info():
         overview = get_system_overview()
-        return jsonify(
-            {
-                "status": "success",
-                "data": {
-                    "project": "Інтелектуальна система прогнозування попиту на товари",
-                    "author": "Чесніший Денис Юрійович",
-                    **overview,
-                },
-            }
-        )
+        return jsonify({"status": "success", "data": {"project": "Інтелектуальна система прогнозування попиту на товари", "author": "Чесніший Денис Юрійович", **overview}})
 
     @app.route("/api/chart-data/<int:product_id>")
     def api_chart_data(product_id: int):
@@ -348,10 +381,7 @@ def create_app() -> Flask:
         sales = load_sales_data(DEFAULT_DATA_PATH)
         product_sales = sales[sales["product_id"] == product_id].sort_values("date").tail(60)
         forecast = forecast_product(product_id, days=days, persist=False)
-        promo_periods = [
-            {"date": row["date"].date().isoformat(), "promo": int(row["promo"])}
-            for row in product_sales.tail(30).to_dict("records")
-        ]
+        promo_periods = [{"date": row["date"].date().isoformat(), "promo": int(row["promo"])} for row in product_sales.tail(30).to_dict("records")]
         return jsonify(
             {
                 "status": "success",
@@ -379,6 +409,7 @@ def create_app() -> Flask:
             message = imported["message"] if not metrics else imported["message"].replace("готова до перенавчання", "перенавчена і готова до роботи")
             return jsonify({"status": "success", "message": message, "import": imported, "metrics": metrics}), 200
         except Exception as exc:
+            app.logger.exception("Помилка імпорту CSV")
             log_import(uploaded_file.filename or "uploaded.csv", 0, 0, "error", str(exc))
             return build_json_error(str(exc), 400)
 
