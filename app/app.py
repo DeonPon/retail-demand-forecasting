@@ -94,6 +94,9 @@ def create_app() -> Flask:
             "product_name": product_name,
             "category": "",
             "forecast_days": 14,
+            "history_last_date": "",
+            "forecast_start_date": "",
+            "forecast_end_date": "",
             "forecast": [],
             "forecast_total": 0,
             "forecast_min": 0,
@@ -121,18 +124,12 @@ def create_app() -> Flask:
         try:
             forecast = forecast_product(selected_product, days=days, persist=False)
             recommendation = purchase_recommendation(selected_product, days=days, persist_forecast=False)
-        except Exception as exc:
+        except Exception:
             app.logger.exception("Помилка побудови прогнозу для dashboard")
             selected_name = next((product["product_name"] for product in products if product["product_id"] == selected_product), "Товар")
             forecast = empty_forecast(selected_product, selected_name)
             forecast_error = "Прогноз тимчасово недоступний, перевірте модель або дані."
 
-        status_cards = [
-            {"label": "Модель", "ok": MODEL_PATH.exists()},
-            {"label": "Метрики", "ok": METRICS_PATH.exists()},
-            {"label": "Дані", "ok": DEFAULT_DATA_PATH.exists()},
-            {"label": "База даних", "ok": DATABASE_PATH.exists()},
-        ]
         return {
             "products": products,
             "selected_product": selected_product,
@@ -147,7 +144,6 @@ def create_app() -> Flask:
             "feature_importance": metrics.get("feature_importance", []),
             "average_forecast": summary["average_forecast"],
             "products_to_order": summary["products_to_order"],
-            "status_cards": status_cards,
             "notice": pop_notice(),
         }
 
@@ -245,14 +241,7 @@ def create_app() -> Flask:
             "forecast_desc": lambda item: -item["forecast_14"],
         }
         products = sorted(products, key=sort_options.get(sort, sort_options["stock_asc"]))
-        return render_template(
-            "products.html",
-            products=products,
-            categories=get_category_names(),
-            selected_category=category,
-            query=request.args.get("q", ""),
-            selected_sort=sort,
-        )
+        return render_template("products.html", products=products, categories=get_category_names(), selected_category=category, query=request.args.get("q", ""), selected_sort=sort)
 
     @app.route("/forecast")
     @login_required
@@ -381,14 +370,17 @@ def create_app() -> Flask:
         sales = load_sales_data(DEFAULT_DATA_PATH)
         product_sales = sales[sales["product_id"] == product_id].sort_values("date").tail(60)
         forecast = forecast_product(product_id, days=days, persist=False)
-        promo_periods = [{"date": row["date"].date().isoformat(), "promo": int(row["promo"])} for row in product_sales.tail(30).to_dict("records")]
         return jsonify(
             {
                 "status": "success",
                 "data": {
-                    "actual": [{"date": row["date"].date().isoformat(), "quantity": float(row["sales_quantity"])} for row in product_sales.to_dict("records")],
-                    "forecast": forecast["forecast"],
-                    "promo_periods": promo_periods,
+                    "history": [
+                        {"date": row["date"].date().isoformat(), "sales": float(row["sales_quantity"]), "promo": bool(int(row["promo"]))}
+                        for row in product_sales.to_dict("records")
+                    ],
+                    "forecast": [{"date": row["date"], "predicted": float(row["predicted_quantity"])} for row in forecast["forecast"]],
+                    "forecast_start_date": forecast["forecast_start_date"],
+                    "history_last_date": forecast["history_last_date"],
                 },
             }
         )

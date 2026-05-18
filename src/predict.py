@@ -57,25 +57,59 @@ def _extract_influence_factors(product_row: pd.Series, history: pd.DataFrame, fo
     last_14 = float(history.tail(14)["sales_quantity"].mean())
 
     if int(product_row["promo"]) == 1:
-        factors.append("Акція активна: очікується додаткове зростання попиту.")
+        factors.append("Акція активна: попит на товар підсилюється.")
+    else:
+        factors.append("Акція зараз не активна, тому прогноз спирається на звичайний попит.")
+
     if history.tail(14)["date"].dt.dayofweek.isin([5, 6]).mean() > 0.25:
-        factors.append("Вихідні дні підсилюють попит у цій категорії.")
-    if float(product_row["stock_quantity"]) < last_7 * 3:
-        factors.append("Поточний залишок низький: товар варто дозакупити заздалегідь.")
+        factors.append("Вихідні дні впливають на попит у цій категорії.")
+
     if last_7 > last_14 * 1.05:
-        factors.append("Продажі за останні 7 днів зростають.")
+        factors.append("За останній тиждень продажі зростали.")
     elif last_7 < last_14 * 0.95:
-        factors.append("Останній тиждень показує спад попиту.")
-    if product_row["category"] == "Молочні продукти":
-        factors.append("Категорія «Молочні продукти» має стабільний щоденний попит.")
-    if float(product_row["price"]) > float(product_row["base_demand"]) * 4:
-        factors.append("Відносно висока ціна може стримувати частину попиту.")
+        factors.append("Останній тиждень показує помірний спад попиту.")
+    else:
+        factors.append("Попит за останні 14 днів залишається відносно стабільним.")
+
+    if float(product_row["stock_quantity"]) < last_7 * 3:
+        factors.append("Поточний залишок низький відносно недавнього попиту.")
+    else:
+        factors.append("Поточний залишок не обмежує продажі в короткому горизонті.")
+
     if float(product_row["supplier_delay_days"]) > 1:
-        factors.append("Затримка постачальника підвищує потребу у страховому запасі.")
-    if forecast_total > last_14 * max(len(history.tail(14)), 1) / 14:
-        factors.append("Базовий попит і сезонність підтримують позитивний прогноз.")
+        factors.append("Затримка постачальника підвищує важливість страхового запасу.")
+
+    if float(product_row["price"]) > float(product_row["base_demand"]) * 4:
+        factors.append("Поточна ціна може стримувати частину попиту.")
 
     return factors[:6]
+
+
+def _build_plain_explanation(latest: pd.Series, product_data: pd.DataFrame, total: float, days: int) -> str:
+    last_14 = product_data.tail(14)["sales_quantity"].astype(float)
+    mean_14 = float(last_14.mean())
+    std_14 = float(last_14.std() or 0.0)
+    current_stock = float(latest["stock_quantity"])
+
+    if std_14 <= max(mean_14 * 0.2, 1.0):
+        dynamics = "стабільний попит за останні 14 днів"
+    elif last_14.iloc[-7:].mean() > last_14.iloc[:7].mean():
+        dynamics = "зростання попиту за останні два тижні"
+    else:
+        dynamics = "помірні коливання попиту без різких стрибків"
+
+    stock_phrase = (
+        "Поточний залишок виглядає достатнім для покриття прогнозованого попиту."
+        if current_stock >= total
+        else "Поточний залишок нижчий за прогнозований попит на вибраний період."
+    )
+
+    return (
+        f"Для товару «{latest['product_name']}» система врахувала {dynamics}, "
+        f"вплив дня тижня, поточну ціну, залишок на складі та сезонність категорії. "
+        f"Прогноз сформовано на період після останньої доступної дати продажів. "
+        f"Очікуваний попит на {days} днів становить {round(total)} одиниць. {stock_phrase}"
+    )
 
 
 def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
@@ -95,7 +129,7 @@ def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
     price_history = product_data["price"].astype(float).tolist()
     promo_history = product_data["promo"].astype(int).tolist()
     current_stock = float(latest["stock_quantity"])
-    last_date = product_data["date"].max()
+    last_date = pd.Timestamp(product_data["date"].max())
     forecast_rows: list[dict] = []
 
     for step in range(1, days + 1):
@@ -126,17 +160,15 @@ def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
 
     total = float(sum(item["predicted_quantity"] for item in forecast_rows))
     values = [item["predicted_quantity"] for item in forecast_rows]
-    explanation = (
-        f"Для товару «{latest['product_name']}» прогноз враховує базовий попит, продажі за останні 14 днів, "
-        f"вплив вихідних, поточну ціну, залишок на складі та затримку постачальника. "
-        f"Очікуваний попит на {days} днів становить {round(total)} одиниць."
-    )
 
     return {
         "product_id": int(product_id),
         "product_name": str(latest["product_name"]),
         "category": str(latest["category"]),
         "forecast_days": int(days),
+        "history_last_date": last_date.date().isoformat(),
+        "forecast_start_date": forecast_rows[0]["date"],
+        "forecast_end_date": forecast_rows[-1]["date"],
         "forecast": forecast_rows,
         "forecast_total": round(total, 2),
         "forecast_min": round(min(values), 2),
@@ -144,7 +176,7 @@ def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
         "forecast_avg": round(total / max(len(values), 1), 2),
         "trend": "зростає" if values[-1] > values[0] * 1.06 else "падає" if values[-1] < values[0] * 0.94 else "стабільний",
         "factors": _extract_influence_factors(latest, product_data, total),
-        "plain_explanation": explanation,
+        "plain_explanation": _build_plain_explanation(latest, product_data, total, days),
         "feature_importance": artifact.get("metrics", {}).get("feature_importance", []),
     }
 

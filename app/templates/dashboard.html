@@ -4,8 +4,8 @@
 <header class="page-header">
   <div>
     <p class="eyebrow">Аналітична панель</p>
-    <h1>Прогнозування попиту та автоматизація закупівель</h1>
-    <p class="page-summary">Dashboard показує стан каталогу, якість моделі, ризик дефіциту та коротке пояснення попиту без важких обчислень для всіх товарів одразу.</p>
+    <h1>Прогнозування попиту та планування закупівель</h1>
+    <p class="page-summary">Головна сторінка показує бізнес-показники: обсяг каталогу, ризик дефіциту, середній прогноз попиту та товари, які потребують уваги менеджера.</p>
   </div>
   <div class="header-actions">
     <form class="upload-form" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
@@ -43,7 +43,7 @@
     <div class="panel-heading">
       <div>
         <h2>{{ forecast.product_name }}</h2>
-        <p>Фактичні продажі за останні 60 днів і прогноз тільки для вибраного товару.</p>
+        <p>Синя лінія показує фактичні продажі за останні 60 днів, зелена пунктирна — прогноз на наступні 14 днів.</p>
       </div>
       <form method="get">
         <select class="form-select form-select-sm" name="product_id" onchange="this.form.submit()">
@@ -55,15 +55,15 @@
     </div>
     <div class="chart-wrap">
       <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="14"></canvas>
-      <div id="chartFallback" class="chart-fallback">Прогнозний графік тимчасово недоступний. KPI, таблиці та службова інформація залишаються доступними.</div>
+      <div id="chartFallback" class="chart-fallback">Графік прогнозу тимчасово недоступний. Показники та таблиці на сторінці залишаються доступними.</div>
     </div>
   </article>
 
   <article class="panel side-panel">
-    <h2>Пояснення прогнозу</h2>
+    <h2>Коротке пояснення прогнозу</h2>
     <p>{{ forecast.plain_explanation }}</p>
     <div class="info-stack">
-      <div><span class="hint-label">Тренд</span><strong>{{ forecast.trend }}</strong></div>
+      <div><span class="hint-label">Період прогнозу</span><strong>{{ forecast.forecast_start_date }} — {{ forecast.forecast_end_date }}</strong></div>
       <div><span class="hint-label">Середній прогноз</span><strong>{{ forecast.forecast_avg }}</strong></div>
       <div><span class="hint-label">Мін / макс</span><strong>{{ forecast.forecast_min }} / {{ forecast.forecast_max }}</strong></div>
       <div><span class="hint-label">Рекомендовано закупити</span><strong>{{ recommendation.recommended_order_quantity if recommendation else 0 }} од.</strong></div>
@@ -76,7 +76,7 @@
     <div class="panel-heading">
       <div>
         <h2>Топ 10 товарів для закупівлі</h2>
-        <p>Швидкий short-list для менеджера без важкого перерахунку всього каталогу.</p>
+        <p>Позиції, де прогнозований попит і страховий запас перевищують поточний залишок.</p>
       </div>
     </div>
     <div class="table-responsive">
@@ -122,8 +122,8 @@
   <article class="panel">
     <div class="panel-heading">
       <div>
-        <h2>Що впливає на прогноз</h2>
-        <p>Коротке пояснення для захисту дипломної роботи.</p>
+        <h2>Фактори, що вплинули на прогноз</h2>
+        <p>Пояснення попиту в термінах, зрозумілих менеджеру та на захисті дипломної.</p>
       </div>
     </div>
     {% if forecast.factors %}
@@ -138,51 +138,32 @@
   </article>
 </section>
 
-<section class="content-grid">
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <h2>Останній імпорт даних</h2>
-        <p>Історія імпортів CSV у SQLite.</p>
-      </div>
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <h2>Останній імпорт даних</h2>
+      <p>Історія завантажень CSV та результат обробки.</p>
     </div>
-    {% if imports %}
-    <div class="table-responsive">
-      <table class="table table-sm">
-        <thead><tr><th>Файл</th><th>Рядків</th><th>Товарів</th><th>Статус</th><th>Дата</th></tr></thead>
-        <tbody>
-          {% for item in imports %}
-          <tr>
-            <td>{{ item.filename }}</td>
-            <td>{{ item.rows_count }}</td>
-            <td>{{ item.products_count }}</td>
-            <td><span class="chip {% if item.status == 'success' %}chip-ok{% else %}chip-danger{% endif %}">{{ item.status }}</span></td>
-            <td>{{ item.imported_at }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty-state">Історія імпортів поки порожня.</div>
-    {% endif %}
-  </article>
-
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <h2>Стан системи</h2>
-        <p>Швидка перевірка файлів даних, моделі, метрик і бази даних.</p>
-      </div>
-    </div>
-    <div class="status-grid">
-      {% for item in status_cards %}
-      <div class="status-card">
-        <span class="hint-label">{{ item.label }}</span>
-        <strong>{{ 'готово' if item.ok else 'відсутнє' }}</strong>
-      </div>
-      {% endfor %}
-    </div>
-  </article>
+  </div>
+  {% if imports %}
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th>Файл</th><th>Рядків</th><th>Товарів</th><th>Статус</th><th>Дата</th></tr></thead>
+      <tbody>
+        {% for item in imports %}
+        <tr>
+          <td>{{ item.filename }}</td>
+          <td>{{ item.rows_count }}</td>
+          <td>{{ item.products_count }}</td>
+          <td><span class="chip {% if item.status == 'success' %}chip-ok{% else %}chip-danger{% endif %}">{{ item.status }}</span></td>
+          <td>{{ item.imported_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">Історія імпортів поки порожня.</div>
+  {% endif %}
 </section>
 {% endblock %}

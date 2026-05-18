@@ -15,8 +15,10 @@ def _priority_for_recommendation(quantity: float, stock_cover_days: float) -> st
     return "низький"
 
 
-def _status_label(priority: str) -> str:
-    return {"високий": "терміново закупити", "середній": "бажано закупити"}.get(priority, "запас нормальний")
+def _status_label(priority: str, quantity: int) -> str:
+    if quantity <= 0:
+        return "закупівля не потрібна"
+    return {"високий": "терміново закупити", "середній": "бажано закупити"}.get(priority, "контроль запасу")
 
 
 def purchase_recommendation(product_id: int, days: int = 14, persist_forecast: bool = False) -> dict:
@@ -41,13 +43,20 @@ def purchase_recommendation(product_id: int, days: int = 14, persist_forecast: b
     recommended_order_quantity = max(0, round(forecast_total + safety_stock - current_stock))
     stock_cover_days = current_stock / mean_demand
     priority = _priority_for_recommendation(recommended_order_quantity, stock_cover_days)
-    explanation = (
-        f"Прогнозований попит: {round(forecast_total)} од. за {days} днів. "
-        f"Поточний залишок: {round(current_stock)} од. "
-        f"Страховий запас: {round(safety_stock)} од. "
-        f"Затримка постачальника: {supplier_delay_days:.0f} дн. "
-        f"Рекомендована закупівля: {recommended_order_quantity} од."
-    )
+
+    if recommended_order_quantity <= 0:
+        explanation = (
+            f"Прогнозований попит становить {round(forecast_total)} од. за {days} днів. "
+            f"Поточний залишок — {round(current_stock)} од., страховий запас — {round(safety_stock)} од. "
+            f"Поточних запасів достатньо, тому додаткова закупівля не потрібна."
+        )
+    else:
+        explanation = (
+            f"Прогнозований попит становить {round(forecast_total)} од. за {days} днів. "
+            f"Поточний залишок — {round(current_stock)} од., страховий запас — {round(safety_stock)} од., "
+            f"затримка постачальника — {supplier_delay_days:.0f} дн. "
+            f"Система рекомендує закупити {recommended_order_quantity} од."
+        )
 
     return {
         "product_id": int(product_id),
@@ -61,7 +70,7 @@ def purchase_recommendation(product_id: int, days: int = 14, persist_forecast: b
         "supplier_delay_days": round(supplier_delay_days, 2),
         "recommended_order_quantity": int(recommended_order_quantity),
         "priority": priority,
-        "status_label": _status_label(priority),
+        "status_label": _status_label(priority, int(recommended_order_quantity)),
         "explanation": explanation,
         "stock_cover_days": round(stock_cover_days, 1),
         "forecast_factors": forecast["factors"],

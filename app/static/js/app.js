@@ -15,11 +15,11 @@ function showChartFallback(id) {
 }
 
 function drawLegend(ctx, items, x, y) {
-  ctx.font = "13px 'Segoe UI', sans-serif";
+  ctx.font = "12px 'Segoe UI', sans-serif";
   items.forEach((item, index) => {
-    const offsetX = x + index * 150;
+    const offsetX = x + index * 145;
     ctx.strokeStyle = item.color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = item.width || 3;
     if (item.dashed) ctx.setLineDash([6, 5]); else ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(offsetX, y);
@@ -27,8 +27,33 @@ function drawLegend(ctx, items, x, y) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = "#10203a";
-    ctx.fillText(item.label, offsetX + 30, y + 4);
+    ctx.fillText(item.label, offsetX + 28, y + 4);
   });
+}
+
+function drawSeries(ctx, values, toX, toY, style) {
+  ctx.save();
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.width || 3;
+  if (style.dashed) ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  let started = false;
+  values.forEach((value, index) => {
+    if (value === null || Number.isNaN(value)) {
+      started = false;
+      return;
+    }
+    const x = toX(index);
+    const y = toY(value);
+    if (!started) {
+      ctx.moveTo(x, y);
+      started = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawDemandChart(canvas, payload) {
@@ -41,14 +66,17 @@ function drawDemandChart(canvas, payload) {
   ctx.scale(ratio, ratio);
   ctx.clearRect(0, 0, width, height);
 
-  const padding = { top: 20, right: 20, bottom: 48, left: 44 };
+  const padding = { top: 20, right: 20, bottom: 56, left: 48 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const actual = payload.actual || [];
+  const history = payload.history || [];
   const forecast = payload.forecast || [];
-  const labels = [...actual.map((item) => item.date), ...forecast.map((item) => item.date)];
-  const values = [...actual.map((item) => Number(item.quantity)), ...forecast.map((item) => Number(item.predicted_quantity))];
-  const maxValue = Math.max(...values, 10) * 1.16;
+  const labels = [...history.map((item) => item.date), ...forecast.map((item) => item.date)];
+  const actualValues = [...history.map((item) => Number(item.sales)), ...forecast.map(() => null)];
+  const forecastValues = [...history.map(() => null), ...forecast.map((item) => Number(item.predicted))];
+  const allValues = [...history.map((item) => Number(item.sales)), ...forecast.map((item) => Number(item.predicted))];
+  const maxValue = Math.max(...allValues, 10) * 1.16;
+  const forecastStartIndex = history.length;
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
@@ -70,43 +98,41 @@ function drawDemandChart(canvas, payload) {
   const toX = (index) => padding.left + (index / Math.max(labels.length - 1, 1)) * plotWidth;
   const toY = (value) => padding.top + plotHeight - (value / maxValue) * plotHeight;
 
-  const drawLine = (series, color, key, dashed) => {
+  if (forecastStartIndex < labels.length) {
+    const xStart = toX(forecastStartIndex);
+    ctx.fillStyle = "rgba(15, 140, 99, 0.05)";
+    ctx.fillRect(xStart, padding.top, width - padding.right - xStart, plotHeight);
+
     ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    if (dashed) ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = "#7c8fb6";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    series.forEach((item, index) => {
-      const pointValue = Number(item[key]);
-      const x = toX(index);
-      const y = toY(pointValue);
-      if (index === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
+    ctx.moveTo(xStart, padding.top);
+    ctx.lineTo(xStart, padding.top + plotHeight);
     ctx.stroke();
     ctx.restore();
-  };
 
-  const promoPeriods = payload.promo_periods || [];
-  promoPeriods.forEach((item, index) => {
-    if (Number(item.promo) !== 1) return;
+    ctx.fillStyle = "#607089";
+    ctx.fillText("Початок прогнозу", Math.min(xStart + 6, width - 130), padding.top + 14);
+  }
+
+  history.forEach((item, index) => {
+    if (!item.promo) return;
     const x = toX(index);
     ctx.fillStyle = "rgba(245, 158, 11, 0.08)";
     ctx.fillRect(x - 3, padding.top, 6, plotHeight);
   });
 
-  drawLine(actual, "#2448d6", "quantity", false);
-  drawLine(forecast, "#0f8c63", "predicted_quantity", true);
-
-  const forecastStart = actual.length ? toX(actual.length - 1) : padding.left;
-  ctx.fillStyle = "rgba(36, 72, 214, 0.04)";
-  ctx.fillRect(forecastStart, padding.top, width - padding.right - forecastStart, plotHeight);
+  drawSeries(ctx, actualValues, toX, toY, { color: "#2448d6", width: 3, dashed: false });
+  drawSeries(ctx, forecastValues, toX, toY, { color: "#0f8c63", width: 3, dashed: true });
 
   drawLegend(ctx, [
     { label: "Фактичні продажі", color: "#2448d6", dashed: false },
     { label: "Прогноз", color: "#0f8c63", dashed: true },
     { label: "Акція", color: "#f59e0b", dashed: false },
-  ], padding.left, height - 18);
+    { label: "Початок прогнозу", color: "#7c8fb6", dashed: true, width: 2 },
+  ], padding.left, height - 20);
 }
 
 function drawImportanceChart(canvas, items) {

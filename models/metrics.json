@@ -5,7 +5,7 @@
   "best_model_name": "ExtraTreesRegressor",
   "train_rows": 20794,
   "test_rows": 5180,
-  "last_training_at": "2026-05-18T13:08:01.738030+00:00",
+  "last_training_at": "2026-05-18T14:26:24.624357+00:00",
   "feature_importance": [
     {
       "feature": "lag_7",
