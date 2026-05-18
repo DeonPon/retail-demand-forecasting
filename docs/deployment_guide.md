@@ -1,56 +1,53 @@
-# Інструкція з запуску та деплою
+# Інструкція з деплою
 
 ## Локальний запуск
-
-Потрібен Python 3.12 або новіший. Якщо на Windows команда `python` відкриває Microsoft Store або не знайдена, встановіть Python з python.org і додайте його в PATH, або використовуйте `py -3.12`.
-
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
 pip install -r requirements.txt
 python src/generate_dataset.py
 python src/train_model.py
 python app/app.py
 ```
 
-Відкрити: `http://127.0.0.1:5000`
+## Запуск у браузері
+Відкрити:
+
+`http://127.0.0.1:5000`
 
 ## GitHub
-
 ```bash
 git init
 git add .
-git commit -m "Initial diploma project prototype"
+git commit -m "Improve realism, dataset, UI and forecasting explanations"
 git branch -M main
 git remote add origin <посилання-на-репозиторій>
 git push -u origin main
 ```
 
-Не потрібно пушити: `.venv`, `__pycache__`, `.env`, локальні `.db` файли, тимчасові файли.
+## Які файли не треба пушити
+- `.venv/`
+- `__pycache__/`
+- `.env`
+- `*.db`
+- `.pytest_cache/`
+- локальні тимчасові логи
 
 ## Render
-
-1. Створити новий Web Service.
-2. Підключити GitHub-репозиторій.
-3. Build command:
-
+### Build command
 ```bash
 pip install -r requirements.txt && python src/generate_dataset.py && python src/train_model.py
 ```
 
-4. Start command:
-
+### Start command
 ```bash
 gunicorn app.app:app
 ```
 
-5. Додати змінну середовища `SECRET_KEY`.
+## Потрібні змінні середовища
+- `SECRET_KEY` — секретний ключ Flask;
+- `PORT` — порт, який надає Render.
 
-## Railway
-
-Railway також може використати `Procfile`. Потрібно встановити змінну `SECRET_KEY` і переконатися, що команда запуску використовує `gunicorn app.app:app`.
-
-## Змінні середовища
-
-- `SECRET_KEY` — секрет Flask session;
-- `PORT` — порт, який автоматично надає платформа деплою.
+## Поради для Render
+- не використовувати абсолютні локальні шляхи;
+- не тягнути критичні frontend-залежності з CDN;
+- важкі обчислення виконувати лише при імпорті або retrain;
+- після `git push` Render може автоматично виконати redeploy.

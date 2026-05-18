@@ -1,23 +1,77 @@
 {% extends "base.html" %}
-{% block title %}Товари | Retail Demand AI{% endblock %}
+{% block title %}Товари | Retail Demand Sense{% endblock %}
 {% block content %}
-<header class="page-header"><div><p class="eyebrow">Каталог</p><h1>Товари</h1></div></header>
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Каталог</p>
+    <h1>Товари ритейлу</h1>
+    <p class="page-summary">Пошук, фільтри, статус залишків і швидкий доступ до прогнозу для кожного товару.</p>
+  </div>
+</header>
+
+<section class="panel filter-panel">
+  <form class="filters-row" method="get">
+    <input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Пошук товару">
+    <select class="form-select" name="category">
+      <option value="">Усі категорії</option>
+      {% for category in categories %}
+      <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>{{ category }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select" name="sort">
+      <option value="stock_asc" {% if selected_sort == 'stock_asc' %}selected{% endif %}>Залишок: зростання</option>
+      <option value="stock_desc" {% if selected_sort == 'stock_desc' %}selected{% endif %}>Залишок: спадання</option>
+      <option value="forecast_desc" {% if selected_sort == 'forecast_desc' %}selected{% endif %}>Прогноз: спадання</option>
+      <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Назва</option>
+    </select>
+    <button class="btn btn-primary" type="submit">Застосувати</button>
+  </form>
+</section>
+
 <section class="panel">
+  {% if products %}
   <div class="table-responsive">
     <table class="table table-hover align-middle">
-      <thead><tr><th>ID</th><th>Назва</th><th>Категорія</th><th>Ціна</th><th>Залишок</th></tr></thead>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Іконка</th>
+          <th>Назва</th>
+          <th>Категорія</th>
+          <th>Ціна</th>
+          <th>Залишок</th>
+          <th>Сер. продаж 7 днів</th>
+          <th>Прогноз 14 днів</th>
+          <th>Статус</th>
+          <th></th>
+        </tr>
+      </thead>
       <tbody>
-      {% for product in products %}
+        {% for product in products %}
         <tr>
           <td>{{ product.product_id }}</td>
+          <td><span class="product-icon">{{ product.product_icon }}</span></td>
           <td>{{ product.product_name }}</td>
           <td>{{ product.category }}</td>
           <td>{{ product.price }}</td>
           <td>{{ product.stock_quantity }}</td>
+          <td>{{ product.avg_sales_7 }}</td>
+          <td>{{ product.forecast_14 }}</td>
+          <td>
+            <div class="tag-row">
+              {% for tag in product.status_tags %}
+              <span class="chip {% if tag == 'низький залишок' %}chip-danger{% elif tag == 'потребує закупівлі' %}chip-warn{% else %}chip-ok{% endif %}">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td><a class="btn btn-secondary btn-sm" href="{{ url_for('forecast_page', product_id=product.product_id) }}">Прогноз</a></td>
         </tr>
-      {% endfor %}
+        {% endfor %}
       </tbody>
     </table>
   </div>
+  {% else %}
+  <div class="empty-state">Нічого не знайдено. Спробуйте інший пошук або очистьте фільтри.</div>
+  {% endif %}
 </section>
 {% endblock %}

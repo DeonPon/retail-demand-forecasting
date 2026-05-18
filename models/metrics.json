@@ -1,8 +1,71 @@
 {
-  "MAE": 7.349,
-  "RMSE": 11.001,
-  "MAPE": 19.852,
-  "train_rows": 2268,
-  "test_rows": 564,
-  "model": "RandomForestRegressor"
+  "MAE": 2.005,
+  "RMSE": 3.194,
+  "MAPE": 12.793,
+  "best_model_name": "ExtraTreesRegressor",
+  "train_rows": 20794,
+  "test_rows": 5180,
+  "last_training_at": "2026-05-18T12:03:17.064781+00:00",
+  "feature_importance": [
+    {
+      "feature": "lag_7",
+      "importance": 0.23369
+    },
+    {
+      "feature": "rolling_mean_14",
+      "importance": 0.18163
+    },
+    {
+      "feature": "lag_14",
+      "importance": 0.17737
+    },
+    {
+      "feature": "rolling_mean_7",
+      "importance": 0.16791
+    },
+    {
+      "feature": "lag_1",
+      "importance": 0.0626
+    },
+    {
+      "feature": "base_demand",
+      "importance": 0.06038
+    },
+    {
+      "feature": "promo",
+      "importance": 0.02125
+    },
+    {
+      "feature": "is_weekend",
+      "importance": 0.01217
+    },
+    {
+      "feature": "supplier_delay_days",
+      "importance": 0.01051
+    },
+    {
+      "feature": "rolling_std_7",
+      "importance": 0.00806
+    }
+  ],
+  "model_comparison": [
+    {
+      "model": "RandomForestRegressor",
+      "MAE": 2.057,
+      "RMSE": 3.287,
+      "MAPE": 12.949
+    },
+    {
+      "model": "GradientBoostingRegressor",
+      "MAE": 2.111,
+      "RMSE": 3.273,
+      "MAPE": 13.253
+    },
+    {
+      "model": "ExtraTreesRegressor",
+      "MAE": 2.005,
+      "RMSE": 3.194,
+      "MAPE": 12.793
+    }
+  ]
 }

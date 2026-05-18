@@ -1,14 +1,66 @@
 {% extends "base.html" %}
-{% block title %}Закупівлі | Retail Demand AI{% endblock %}
+{% block title %}Закупівлі | Retail Demand Sense{% endblock %}
 {% block content %}
-<header class="page-header"><div><p class="eyebrow">Автоматизація ритейлу</p><h1>Рекомендації закупівель</h1></div></header>
-<section class="cards-grid">
-  {% for item in recommendations %}
-  <article class="panel recommendation-card">
-    <span>{{ item.product_name }}</span>
-    <strong>{{ item.recommended_order_quantity }} од.</strong>
-    <p>{{ item.explanation }}</p>
-  </article>
-  {% endfor %}
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Рекомендації</p>
+    <h1>Рекомендації закупівель</h1>
+    <p class="page-summary">Система оцінює попит, страховий запас, затримку постачання та поточний залишок, після чого формує пріоритет закупівлі.</p>
+  </div>
+  <div class="header-actions">
+    <form method="get" class="filters-row compact">
+      <select class="form-select" name="days" onchange="this.form.submit()">
+        {% for option in [7, 14, 30] %}
+        <option value="{{ option }}" {% if option == days %}selected{% endif %}>Горизонт {{ option }} днів</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('recommendations_export', days=days) }}">Експорт CSV</a>
+  </div>
+</header>
+
+<section class="panel">
+  {% if recommendations %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Товар</th>
+          <th>Категорія</th>
+          <th>Прогноз</th>
+          <th>Залишок</th>
+          <th>Страховий запас</th>
+          <th>Затримка</th>
+          <th>Закупівля</th>
+          <th>Пріоритет</th>
+          <th>Пояснення</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in recommendations %}
+        <tr>
+          <td>{{ item.product_icon }} {{ item.product_name }}</td>
+          <td>{{ item.category }}</td>
+          <td>{{ item.forecast_total }}</td>
+          <td>{{ item.current_stock }}</td>
+          <td>{{ item.safety_stock }}</td>
+          <td>{{ item.supplier_delay_days }} дн.</td>
+          <td>{{ item.recommended_order_quantity }}</td>
+          <td>
+            <span class="chip {% if item.priority == 'високий' %}chip-danger{% elif item.priority == 'середній' %}chip-warn{% else %}chip-ok{% endif %}">
+              {{ item.status_label }}
+            </span>
+          </td>
+          <td class="stack-compact">
+            <span>{{ item.explanation }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">Рекомендації поки що недоступні. Переконайтеся, що модель навчена та дані завантажені.</div>
+  {% endif %}
 </section>
 {% endblock %}

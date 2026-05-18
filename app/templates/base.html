@@ -3,29 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Retail Demand AI{% endblock %}</title>
+    <title>{% block title %}Retail Demand Sense{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon') }}">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-mark">AI</span>
+        <a class="brand" href="{{ url_for('dashboard') }}">
+          <img class="brand-logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Retail Demand Sense">
           <div>
-            <strong>Retail Demand</strong>
-            <small>Forecasting System</small>
+            <strong>Retail Demand Sense</strong>
+            <small>Аналітика попиту для ритейлу</small>
           </div>
-        </div>
+        </a>
         <nav class="nav-menu">
-          <a href="{{ url_for('dashboard') }}">Dashboard</a>
-          <a href="{{ url_for('products_page') }}">Товари</a>
-          <a href="{{ url_for('forecast_page') }}">Прогноз</a>
-          <a href="{{ url_for('recommendations_page') }}">Закупівлі</a>
-          <a href="{{ url_for('metrics_page') }}">Метрики</a>
-          <a href="{{ url_for('about_page') }}">Про систему</a>
+          <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+          <a class="{{ 'active' if request.endpoint == 'products_page' else '' }}" href="{{ url_for('products_page') }}">Товари</a>
+          <a class="{{ 'active' if request.endpoint == 'forecast_page' else '' }}" href="{{ url_for('forecast_page') }}">Прогноз</a>
+          <a class="{{ 'active' if request.endpoint == 'recommendations_page' else '' }}" href="{{ url_for('recommendations_page') }}">Закупівлі</a>
+          <a class="{{ 'active' if request.endpoint == 'metrics_page' else '' }}" href="{{ url_for('metrics_page') }}">Метрики</a>
+          <a class="{{ 'active' if request.endpoint == 'about_page' else '' }}" href="{{ url_for('about_page') }}">Про систему</a>
         </nav>
         <div class="sidebar-footer">
-          <span>{{ session.get('user', {}).get('username', 'manager') }}</span>
+          <div>
+            <span class="chip chip-ok">demo access</span>
+            <p>{{ session.get('user', {}).get('username', 'manager') }}</p>
+          </div>
           <a href="{{ url_for('logout') }}">Вийти</a>
         </div>
       </aside>
@@ -34,6 +38,6 @@
         {% block content %}{% endblock %}
       </main>
     </div>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
   </body>
 </html>

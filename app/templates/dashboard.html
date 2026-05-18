@@ -1,83 +1,180 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Retail Demand AI{% endblock %}
+{% block title %}Dashboard | Retail Demand Sense{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
     <p class="eyebrow">Аналітична панель</p>
-    <h1>Прогнозування попиту та закупівель</h1>
+    <h1>Прогнозування попиту та автоматизація закупівель</h1>
+    <p class="page-summary">Dashboard показує стан товарного каталогу, якість моделі, фактори попиту, товари з ризиком дефіциту та історію імпорту даних.</p>
   </div>
-  <form class="upload-form" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
-    <input class="form-control form-control-sm" type="file" name="file" accept=".csv">
-    <button class="btn btn-primary btn-sm" type="submit">Оновити CSV</button>
-  </form>
+  <div class="header-actions">
+    <form class="upload-form" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
+      <input class="form-control form-control-sm" type="file" name="file" accept=".csv" required>
+      <button class="btn btn-primary btn-sm" type="submit" data-loading-text="Імпортуємо...">Імпорт CSV</button>
+    </form>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('download_sample_csv') }}">Приклад CSV</a>
+  </div>
 </header>
 
-<section class="kpi-grid">
-  <div class="kpi-card"><span>Товарів</span><strong>{{ products|length }}</strong></div>
-  <div class="kpi-card"><span>Середній прогноз</span><strong>{{ average_forecast }}</strong></div>
-  <div class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong></div>
-  <div class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong></div>
-  <div class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong></div>
-  <div class="kpi-card accent"><span>Потребують закупівлі</span><strong>{{ products_to_order }}</strong></div>
+{% if notice %}
+<section class="alert {% if notice.level == 'error' %}alert-danger{% else %}alert-success{% endif %}">
+  {{ notice.message }}
+</section>
+{% endif %}
+
+<section class="kpi-grid kpi-grid-large">
+  <article class="kpi-card"><span>Товарів</span><strong>{{ overview.products_count }}</strong></article>
+  <article class="kpi-card"><span>Категорій</span><strong>{{ overview.categories_count }}</strong></article>
+  <article class="kpi-card"><span>Записів продажів</span><strong>{{ overview.sales_rows_count }}</strong></article>
+  <article class="kpi-card"><span>Середній прогноз</span><strong>{{ average_forecast }}</strong></article>
+  <article class="kpi-card"><span>Потребують закупівлі</span><strong>{{ products_to_order }}</strong></article>
+  <article class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong></article>
+  <article class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong></article>
+  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong></article>
+  <article class="kpi-card accent"><span>Найкраща модель</span><strong>{{ metrics.get('best_model_name', '—') }}</strong></article>
 </section>
 
-<section class="content-grid">
-  <div class="panel wide">
+<section class="content-grid dashboard-grid">
+  <article class="panel chart-panel">
     <div class="panel-heading">
       <div>
         <h2>{{ forecast.product_name }}</h2>
-        <p>Фактичні продажі за останні 45 днів і прогноз на 14 днів</p>
+        <p>Фактичні продажі за останні 60 днів, прогноз на 14 днів і позначення акційних періодів.</p>
       </div>
       <form method="get">
         <select class="form-select form-select-sm" name="product_id" onchange="this.form.submit()">
           {% for product in products %}
-            <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
+          <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_icon }} {{ product.product_name }}</option>
           {% endfor %}
         </select>
       </form>
     </div>
     <div class="chart-wrap">
-      <canvas id="demandChart" data-product-id="{{ selected_product }}"></canvas>
-      <div id="chartFallback" class="chart-fallback">
-        Графік тимчасово недоступний, але прогноз і таблиці нижче працюють без JavaScript.
-      </div>
+      <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="14"></canvas>
+      <div id="chartFallback" class="chart-fallback">Графік тимчасово недоступний. Усі KPI, таблиці та пояснення прогнозу залишаються доступними нижче.</div>
     </div>
-    <noscript>
-      <div class="chart-fallback visible">
-        JavaScript вимкнено. Основні показники, прогноз і рекомендації доступні в таблицях.
-      </div>
-    </noscript>
-  </div>
+  </article>
 
-  <div class="panel recommendation-panel">
-    <h2>Рекомендація закупівлі</h2>
-    <strong>{{ recommendation.recommended_order_quantity }} од.</strong>
-    <p>{{ recommendation.explanation }}</p>
-  </div>
+  <article class="panel side-panel">
+    <h2>Коротке пояснення прогнозу</h2>
+    <p>{{ forecast.plain_explanation }}</p>
+    <div class="info-stack">
+      <div><span class="hint-label">Тренд</span><strong>{{ forecast.trend }}</strong></div>
+      <div><span class="hint-label">Середній прогноз</span><strong>{{ forecast.forecast_avg }}</strong></div>
+      <div><span class="hint-label">Мін / макс</span><strong>{{ forecast.forecast_min }} / {{ forecast.forecast_max }}</strong></div>
+      <div><span class="hint-label">Рекомендовано закупити</span><strong>{{ recommendation.recommended_order_quantity }} од.</strong></div>
+    </div>
+  </article>
 </section>
 
-<section class="panel">
-  <div class="panel-heading">
-    <div>
-      <h2>Товари та прогноз</h2>
-      <p>Коротка таблиця для менеджера закупівель</p>
+<section class="tri-grid">
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Топ товарів для закупівлі</h2>
+        <p>Позиції, де прогнозований попит перевищує поточний запас.</p>
+      </div>
     </div>
-  </div>
-  <div class="table-responsive">
-    <table class="table table-hover align-middle">
-      <thead><tr><th>Товар</th><th>Категорія</th><th>Залишок</th><th>Прогноз 14 днів</th><th>Закупити</th></tr></thead>
-      <tbody>
-      {% for item in recommendations %}
-        <tr>
-          <td>{{ item.product_name }}</td>
-          <td>{{ products[loop.index0].category }}</td>
-          <td>{{ item.current_stock }}</td>
-          <td>{{ item.forecast_total }}</td>
-          <td><span class="badge text-bg-{{ 'primary' if item.recommended_order_quantity > 0 else 'secondary' }}">{{ item.recommended_order_quantity }}</span></td>
-        </tr>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead><tr><th>Товар</th><th>Прогноз</th><th>Залишок</th><th>Закупити</th></tr></thead>
+        <tbody>
+          {% for item in top_to_buy %}
+          <tr>
+            <td>{{ item.product_icon }} {{ item.product_name }}</td>
+            <td>{{ item.forecast_total }}</td>
+            <td>{{ item.current_stock }}</td>
+            <td><span class="chip chip-danger">{{ item.recommended_order_quantity }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Товари з ризиком дефіциту</h2>
+        <p>Позиції з низьким покриттям запасу в днях.</p>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead><tr><th>Товар</th><th>Покриття, днів</th><th>Пріоритет</th></tr></thead>
+        <tbody>
+          {% for item in risk_items %}
+          <tr>
+            <td>{{ item.product_icon }} {{ item.product_name }}</td>
+            <td>{{ item.stock_cover_days }}</td>
+            <td><span class="chip {% if item.priority == 'високий' %}chip-danger{% elif item.priority == 'середній' %}chip-warn{% else %}chip-ok{% endif %}">{{ item.priority }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Що впливає на прогноз</h2>
+        <p>Пояснення для захисту дипломної простими словами.</p>
+      </div>
+    </div>
+    <ul class="plain-list">
+      {% for factor in forecast.factors %}
+      <li>{{ factor }}</li>
       {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    </ul>
+  </article>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Останній імпорт даних</h2>
+        <p>Історія завантажень CSV у SQLite та статус обробки.</p>
+      </div>
+    </div>
+    {% if imports %}
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr><th>Файл</th><th>Рядків</th><th>Товарів</th><th>Статус</th><th>Дата</th></tr></thead>
+        <tbody>
+          {% for item in imports %}
+          <tr>
+            <td>{{ item.filename }}</td>
+            <td>{{ item.rows_count }}</td>
+            <td>{{ item.products_count }}</td>
+            <td><span class="chip {% if item.status == 'success' %}chip-ok{% else %}chip-danger{% endif %}">{{ item.status }}</span></td>
+            <td>{{ item.imported_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">Історія імпортів поки порожня.</div>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Стан системи</h2>
+        <p>Швидка перевірка наявності даних, моделі, метрик і бази даних.</p>
+      </div>
+    </div>
+    <div class="status-grid">
+      {% for item in status_cards %}
+      <div class="status-card">
+        <span class="hint-label">{{ item.label }}</span>
+        <strong>{{ 'готово' if item.ok else 'відсутнє' }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
 </section>
 {% endblock %}

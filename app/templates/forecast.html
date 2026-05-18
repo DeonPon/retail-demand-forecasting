@@ -1,25 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Прогноз | Retail Demand AI{% endblock %}
+{% block title %}Прогноз | Retail Demand Sense{% endblock %}
 {% block content %}
 <header class="page-header">
-  <div><p class="eyebrow">ML-модель</p><h1>Прогноз попиту</h1></div>
-  <form method="get" class="d-flex gap-2">
-    <select class="form-select form-select-sm" name="product_id">
+  <div>
+    <p class="eyebrow">ML-модуль</p>
+    <h1>Прогноз попиту по товару</h1>
+    <p class="page-summary">Сторінка пояснює прогноз не лише числами, а й факторами, які впливають на очікуваний попит.</p>
+  </div>
+  <form method="get" class="filters-row compact">
+    <select class="form-select" name="product_id">
       {% for product in products %}
-        <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
+      <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_icon }} {{ product.product_name }}</option>
       {% endfor %}
     </select>
-    <button class="btn btn-primary btn-sm">Показати</button>
+    <select class="form-select" name="days">
+      {% for option in [7, 14, 30] %}
+      <option value="{{ option }}" {% if option == days %}selected{% endif %}>{{ option }} днів</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit">Оновити прогноз</button>
   </form>
 </header>
+
+<section class="content-grid dashboard-grid">
+  <article class="panel chart-panel">
+    <div class="panel-heading">
+      <div>
+        <h2>{{ forecast.product_name }}</h2>
+        <p>Графік фактичних продажів і прогнозу на {{ forecast.forecast_days }} днів.</p>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="{{ days }}"></canvas>
+      <div id="chartFallback" class="chart-fallback">Графік тимчасово недоступний. Нижче залишається таблиця прогнозу та текстове пояснення.</div>
+    </div>
+  </article>
+
+  <article class="panel side-panel">
+    <h2>Пояснення прогнозу</h2>
+    <p>{{ forecast.plain_explanation }}</p>
+    <div class="info-stack">
+      <div><span class="hint-label">Середній прогноз</span><strong>{{ forecast.forecast_avg }}</strong></div>
+      <div><span class="hint-label">Мінімум</span><strong>{{ forecast.forecast_min }}</strong></div>
+      <div><span class="hint-label">Максимум</span><strong>{{ forecast.forecast_max }}</strong></div>
+      <div><span class="hint-label">Тренд</span><strong>{{ forecast.trend }}</strong></div>
+    </div>
+  </article>
+</section>
+
+<section class="tri-grid">
+  <article class="panel">
+    <h2>Фактори впливу на прогноз</h2>
+    <ul class="plain-list">
+      {% for factor in forecast.factors %}
+      <li>{{ factor }}</li>
+      {% endfor %}
+    </ul>
+  </article>
+
+  <article class="panel">
+    <h2>Важливість ознак моделі</h2>
+    <div class="chart-wrap chart-wrap-small">
+      <canvas id="importanceChart" data-chart="importance" data-importance='{{ forecast.feature_importance | tojson }}'></canvas>
+      <div id="importanceFallback" class="chart-fallback">Список важливих ознак доступний нижче.</div>
+    </div>
+    <div class="tag-row">
+      {% for item in forecast.feature_importance[:5] %}
+      <span class="chip chip-neutral">{{ item.feature }}: {{ item.importance }}</span>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <h2>Підсумок</h2>
+    <p>Очікуваний попит за {{ days }} днів: <strong>{{ forecast.forecast_total }}</strong> од.</p>
+    <p>Модель: <strong>{{ metrics.get('best_model_name', '—') }}</strong></p>
+    <p>MAPE: <strong>{{ metrics.get('MAPE', '—') }}%</strong></p>
+  </article>
+</section>
+
 <section class="panel">
-  <h2>{{ forecast.product_name }}</h2>
+  <h2>Прогноз по днях</h2>
   <div class="table-responsive">
     <table class="table table-sm">
       <thead><tr><th>Дата</th><th>Прогнозована кількість</th></tr></thead>
       <tbody>
       {% for row in forecast.forecast %}
-        <tr><td>{{ row.date }}</td><td>{{ row.predicted_quantity }}</td></tr>
+        <tr>
+          <td>{{ row.date }}</td>
+          <td>{{ row.predicted_quantity }}</td>
+        </tr>
       {% endfor %}
       </tbody>
     </table>

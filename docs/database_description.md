@@ -1,61 +1,115 @@
 # Опис бази даних
 
-## Загальна характеристика
+## Призначення
+SQLite база даних демонструє структуру даних дипломного прототипу та використовується для зберігання імпортованих продажів, товарів, метрик і рекомендацій.
 
-SQLite використовується як проста демонстраційна база даних дипломного прототипу. Вона дозволяє показати структуру зберігання користувачів, товарів, продажів, прогнозів і метрик моделі.
+## Таблиці
 
-## Таблиця users
+### `users`
+- `id`
+- `username`
+- `password_hash`
+- `role`
+- `created_at`
 
-- `id` — первинний ключ;
-- `username` — логін користувача;
-- `password_hash` — хеш пароля;
-- `role` — роль користувача;
-- `created_at` — дата створення.
+Призначення: зберігання користувачів системи.
 
-Призначення: санкціонований доступ до dashboard.
+### `products`
+- `id`
+- `name`
+- `category`
+- `product_icon`
+- `price`
+- `stock_quantity`
+- `base_demand`
+- `seasonality_type`
+- `shelf_life_days`
+- `supplier_name`
+- `region`
 
-## Таблиця products
+Призначення: довідник товарів та їх актуальних характеристик.
 
-- `id` — ідентифікатор товару;
-- `name` — назва товару;
-- `category` — категорія;
-- `price` — ціна;
-- `stock_quantity` — залишок.
+### `sales`
+- `id`
+- `product_id`
+- `date`
+- `quantity`
+- `price`
+- `stock_quantity`
+- `promo`
+- `holiday`
+- `supplier_delay_days`
 
-Призначення: каталог товарів.
+Призначення: історичні записи продажів.
 
-## Таблиця sales
+### `forecasts`
+- `id`
+- `product_id`
+- `forecast_date`
+- `predicted_quantity`
+- `created_at`
 
-- `id` — первинний ключ;
-- `product_id` — посилання на товар;
-- `date` — дата продажу;
-- `quantity` — кількість проданих одиниць;
-- `promo` — ознака акції;
-- `holiday` — ознака свята.
+Призначення: історія сформованих прогнозів.
 
-Призначення: історія продажів.
+### `model_metrics`
+- `id`
+- `model_name`
+- `mae`
+- `rmse`
+- `mape`
+- `created_at`
+- `raw_metrics_json`
 
-## Таблиця forecasts
+Призначення: історія навчання моделей і збереження метрик.
 
-- `id` — первинний ключ;
-- `product_id` — посилання на товар;
-- `forecast_date` — дата прогнозу;
-- `predicted_quantity` — прогнозована кількість;
-- `created_at` — дата створення прогнозу.
+### `imports`
+- `id`
+- `filename`
+- `rows_count`
+- `products_count`
+- `imported_at`
+- `status`
+- `error_message`
 
-Призначення: збереження результатів прогнозування.
+Призначення: журнал імпортів CSV.
 
-## Таблиця model_metrics
+### `recommendations`
+- `id`
+- `product_id`
+- `forecast_days`
+- `forecast_quantity`
+- `current_stock`
+- `safety_stock`
+- `recommended_order_quantity`
+- `explanation`
+- `priority`
+- `created_at`
 
-- `id` — первинний ключ;
-- `mae` — середня абсолютна помилка;
-- `rmse` — корінь середньоквадратичної помилки;
-- `mape` — середня абсолютна відсоткова помилка;
-- `created_at` — дата розрахунку.
+Призначення: історія рекомендацій закупівель.
+
+## Зв’язки
+- `sales.product_id -> products.id`
+- `forecasts.product_id -> products.id`
+- `recommendations.product_id -> products.id`
 
 ## ER-структура текстом
+Один товар з таблиці `products` може мати багато записів у `sales`, багато сформованих прогнозів у `forecasts` і багато рекомендацій у `recommendations`. Таблиця `imports` зберігає службову історію імпорту, а `model_metrics` — історію навчання моделей.
 
-`products` 1:N `sales`  
-`products` 1:N `forecasts`  
-`users` використовується для доступу до системи  
-`model_metrics` зберігає історію якості моделі
+## Формат CSV для імпорту
+### Обов’язкові колонки
+- `date`
+- `product_id`
+- `product_name`
+- `category`
+- `sales_quantity`
+- `price`
+- `stock_quantity`
+- `promo`
+- `holiday`
+- `supplier_delay_days`
+
+### Додаткові колонки
+- `product_icon`
+- `shelf_life_days`
+- `supplier_name`
+- `region`

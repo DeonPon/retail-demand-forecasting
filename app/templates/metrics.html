@@ -1,14 +1,73 @@
 {% extends "base.html" %}
-{% block title %}Метрики | Retail Demand AI{% endblock %}
+{% block title %}Метрики | Retail Demand Sense{% endblock %}
 {% block content %}
-<header class="page-header"><div><p class="eyebrow">Якість моделі</p><h1>Метрики прогнозування</h1></div></header>
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Якість моделі</p>
+    <h1>Метрики та порівняння моделей</h1>
+    <p class="page-summary">Панель пояснює, чому система обрала конкретну модель і як інтерпретувати її точність у практичних термінах.</p>
+  </div>
+</header>
+
 <section class="kpi-grid compact">
-  <div class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong><p>Середня абсолютна помилка в одиницях товару.</p></div>
-  <div class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong><p>Помилка, чутлива до великих відхилень.</p></div>
-  <div class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>Середня відносна помилка у відсотках.</p></div>
+  <article class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong><p>Середня помилка в одиницях товару.</p></article>
+  <article class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong><p>Сильніше штрафує великі помилки.</p></article>
+  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>Середня відносна помилка у відсотках.</p></article>
 </section>
+
+<section class="content-grid">
+  <article class="panel">
+    <h2>Підсумок навчання</h2>
+    <div class="info-stack">
+      <div><span class="hint-label">Найкраща модель</span><strong>{{ metrics.get('best_model_name', '—') }}</strong></div>
+      <div><span class="hint-label">Train rows</span><strong>{{ metrics.get('train_rows', '—') }}</strong></div>
+      <div><span class="hint-label">Test rows</span><strong>{{ metrics.get('test_rows', '—') }}</strong></div>
+      <div><span class="hint-label">Останнє навчання</span><strong>{{ metrics.get('last_training_at', '—') }}</strong></div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <h2>Важливість ознак</h2>
+    <div class="chart-wrap chart-wrap-small">
+      <canvas id="importanceChart" data-chart="importance" data-importance='{{ metrics.get("feature_importance", []) | tojson }}'></canvas>
+      <div id="importanceFallback" class="chart-fallback">Список важливих ознак доступний нижче.</div>
+    </div>
+    <div class="tag-row">
+      {% for item in metrics.get('feature_importance', []) %}
+      <span class="chip chip-neutral">{{ item.feature }}: {{ item.importance }}</span>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
 <section class="panel">
-  <h2>Параметри експерименту</h2>
-  <p>Модель: {{ metrics.get('model', 'RandomForestRegressor') }}. Навчальних рядків: {{ metrics.get('train_rows', '-') }}. Тестових рядків: {{ metrics.get('test_rows', '-') }}.</p>
+  <h2>Порівняння моделей</h2>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead><tr><th>Модель</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Статус</th></tr></thead>
+      <tbody>
+        {% for item in metrics.get('model_comparison', []) %}
+        <tr>
+          <td>{{ item.model }}</td>
+          <td>{{ item.MAE }}</td>
+          <td>{{ item.RMSE }}</td>
+          <td>{{ item.MAPE }}</td>
+          <td>
+            {% if item.model == metrics.get('best_model_name') %}
+            <span class="chip chip-ok">обрана</span>
+            {% else %}
+            <span class="chip chip-neutral">кандидат</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Стан системи</h2>
+  <p>Товарів у базі: {{ overview.products_count }}. Записів продажів: {{ overview.sales_rows_count }}. Останній імпорт: {{ overview.last_import_at or '—' }}.</p>
 </section>
 {% endblock %}

@@ -3,31 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Вхід | Retail Demand AI</title>
+    <title>Вхід | Retail Demand Sense</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon') }}">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
   </head>
   <body class="login-body">
-    <main class="login-card">
-      <div class="brand login-brand">
-        <span class="brand-mark">AI</span>
-        <div>
-          <strong>Retail Demand</strong>
-          <small>Forecasting System</small>
+    <div class="login-shell">
+      <section class="login-card panel">
+        <div class="login-brand eyebrow">Дипломний прототип</div>
+        <h1>Вхід до системи прогнозування попиту</h1>
+        <p class="page-summary">Увійдіть під демо-користувачем, щоб переглянути dashboard, прогноз попиту, рекомендації закупівель і метрики моделі.</p>
+
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" class="stack">
+          <label class="stack">
+            <span class="form-label">Логін</span>
+            <input class="form-control" type="text" name="username" placeholder="admin" required>
+          </label>
+          <label class="stack">
+            <span class="form-label">Пароль</span>
+            <input class="form-control" type="password" name="password" placeholder="admin123" required>
+          </label>
+          <button class="btn btn-primary" type="submit" data-loading-text="Виконуємо вхід...">Увійти</button>
+        </form>
+
+        <div class="demo-access">
+          <span class="chip chip-neutral">demo</span>
+          <span><strong>admin</strong> / <strong>admin123</strong></span>
         </div>
-      </div>
-      <h1>Вхід менеджера</h1>
-      <p>Демонстраційний санкціонований доступ для дипломного прототипу.</p>
-      {% if error %}
-        <div class="alert alert-danger py-2">{{ error }}</div>
-      {% endif %}
-      <form method="post">
-        <label class="form-label">Логін</label>
-        <input class="form-control" name="username" value="admin" required>
-        <label class="form-label mt-3">Пароль</label>
-        <input class="form-control" type="password" name="password" value="admin123" required>
-        <button class="btn btn-primary w-100 mt-4" type="submit">Увійти</button>
-      </form>
-      <div class="demo-access">Демо: admin / admin123</div>
-    </main>
+      </section>
+
+      <aside class="login-aside">
+        <article class="hero-card">
+          <h2>Що вміє система</h2>
+          <ul class="plain-list">
+            <li>Працює з реалістичним набором ритейл-даних на 74 товари та 12 категорій.</li>
+            <li>Порівнює кілька ML-моделей і автоматично обирає найкращу за MAPE.</li>
+            <li>Пояснює прогноз через фактори попиту, а не лише через цифри.</li>
+            <li>Формує рекомендації закупівель з урахуванням запасу та затримки постачання.</li>
+            <li>Підтримує імпорт CSV у SQLite та історію завантажень.</li>
+          </ul>
+        </article>
+      </aside>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
   </body>
 </html>
