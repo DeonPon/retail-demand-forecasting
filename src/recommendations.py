@@ -2,8 +2,8 @@ from data_processing import DEFAULT_DATA_PATH, load_sales_data
 from predict import forecast_product
 
 
-def purchase_recommendation(product_id: int, days: int = 14, safety_factor: float = 0.15) -> dict:
-    forecast = forecast_product(product_id, days=days)
+def purchase_recommendation(product_id: int, days: int = 14, safety_factor: float = 0.15, persist_forecast: bool = False) -> dict:
+    forecast = forecast_product(product_id, days=days, persist=persist_forecast)
     data = load_sales_data(DEFAULT_DATA_PATH)
     latest = data[data["product_id"] == product_id].sort_values("date").iloc[-1]
 

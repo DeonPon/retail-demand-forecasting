@@ -36,7 +36,17 @@
         </select>
       </form>
     </div>
-    <canvas id="demandChart" data-product-id="{{ selected_product }}"></canvas>
+    <div class="chart-wrap">
+      <canvas id="demandChart" data-product-id="{{ selected_product }}"></canvas>
+      <div id="chartFallback" class="chart-fallback">
+        Графік тимчасово недоступний, але прогноз і таблиці нижче працюють без JavaScript.
+      </div>
+    </div>
+    <noscript>
+      <div class="chart-fallback visible">
+        JavaScript вимкнено. Основні показники, прогноз і рекомендації доступні в таблицях.
+      </div>
+    </noscript>
   </div>
 
   <div class="panel recommendation-panel">

@@ -14,7 +14,7 @@ Backend реалізовано на Flask. Він відповідає за ст
 
 ## Frontend
 
-Frontend побудований на HTML, CSS, Bootstrap і Chart.js. Інтерфейс містить сторінки Login, Dashboard, Products, Forecast, Recommendations, Model Metrics і About System.
+Frontend побудований на HTML, CSS і локальному JavaScript. Графік dashboard малюється через Canvas API без зовнішніх CDN-залежностей, тому сторінка залишається працездатною навіть якщо JavaScript або API графіка тимчасово недоступні. Інтерфейс містить сторінки Login, Dashboard, Products, Forecast, Recommendations, Model Metrics і About System.
 
 ## ML-модуль
 

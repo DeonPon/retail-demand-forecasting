@@ -13,17 +13,17 @@ sys.path.append(str(SRC_DIR))
 sys.path.append(str(ROOT_DIR / "app" / "auth"))
 
 from auth import authenticate, login_required
-from data_processing import DEFAULT_DATA_PATH, load_sales_data, save_uploaded_dataset
+from data_processing import DEFAULT_DATA_PATH, clear_data_cache, load_sales_data, save_uploaded_dataset
 from database import initialize_database, seed_from_csv
 from generate_dataset import main as generate_dataset
 from predict import (
     ModelNotTrainedError,
     NotEnoughDataError,
     ProductNotFoundError,
+    clear_model_cache,
     forecast_product,
     get_metrics,
     get_products,
-    total_forecast_for_product,
 )
 from recommendations import purchase_recommendation
 from train_model import train_model
@@ -72,9 +72,9 @@ def create_app() -> Flask:
         products = get_products()
         selected_product = int(request.args.get("product_id", products[0]["product_id"] if products else 1))
         metrics = get_metrics()
-        forecast = forecast_product(selected_product, days=14)
-        recommendation = purchase_recommendation(selected_product, days=14)
-        recommendations = [purchase_recommendation(int(p["product_id"]), days=14) for p in products]
+        forecast = forecast_product(selected_product, days=14, persist=False)
+        recommendation = purchase_recommendation(selected_product, days=14, persist_forecast=False)
+        recommendations = [purchase_recommendation(int(p["product_id"]), days=14, persist_forecast=False) for p in products]
         products_to_order = sum(1 for item in recommendations if item["recommended_order_quantity"] > 0)
         average_forecast = round(
             sum(item["forecast_total"] for item in recommendations) / len(recommendations), 2
@@ -102,14 +102,14 @@ def create_app() -> Flask:
     def forecast_page():
         products = get_products()
         selected_product = int(request.args.get("product_id", products[0]["product_id"] if products else 1))
-        forecast = forecast_product(selected_product, days=int(request.args.get("days", 14)))
+        forecast = forecast_product(selected_product, days=int(request.args.get("days", 14)), persist=False)
         return render_template("forecast.html", products=products, selected_product=selected_product, forecast=forecast)
 
     @app.route("/recommendations")
     @login_required
     def recommendations_page():
         products = get_products()
-        recommendations = [purchase_recommendation(int(p["product_id"]), days=14) for p in products]
+        recommendations = [purchase_recommendation(int(p["product_id"]), days=14, persist_forecast=False) for p in products]
         return render_template("recommendations.html", recommendations=recommendations)
 
     @app.route("/metrics")
@@ -137,12 +137,12 @@ def create_app() -> Flask:
     @app.route("/api/forecast/<int:product_id>")
     def api_forecast(product_id: int):
         days = int(request.args.get("days", 14))
-        return jsonify({"status": "success", "data": forecast_product(product_id, days=days)})
+        return jsonify({"status": "success", "data": forecast_product(product_id, days=days, persist=True)})
 
     @app.route("/api/recommendation/<int:product_id>")
     def api_recommendation(product_id: int):
         days = int(request.args.get("days", 14))
-        return jsonify({"status": "success", "data": purchase_recommendation(product_id, days=days)})
+        return jsonify({"status": "success", "data": purchase_recommendation(product_id, days=days, persist_forecast=True)})
 
     @app.route("/api/metrics")
     def api_metrics():
@@ -155,9 +155,24 @@ def create_app() -> Flask:
 
     @app.route("/api/retrain", methods=["POST"])
     def api_retrain():
+        clear_data_cache()
         metrics = train_model()
+        clear_model_cache()
         seed_from_csv()
         return jsonify({"status": "success", "message": "Модель перенавчено.", "metrics": metrics})
+
+    @app.route("/health")
+    def health():
+        return jsonify(
+            {
+                "status": "ok",
+                "app": "running",
+                "model_exists": (ROOT_DIR / "models" / "demand_model.joblib").exists(),
+                "metrics_exists": (ROOT_DIR / "models" / "metrics.json").exists(),
+                "data_exists": DEFAULT_DATA_PATH.exists(),
+                "database_exists": (ROOT_DIR / "retail_demand.db").exists(),
+            }
+        )
 
     @app.route("/api/system-info")
     def api_system_info():
@@ -167,7 +182,7 @@ def create_app() -> Flask:
                 "data": {
                     "project": "Інтелектуальна система прогнозування попиту",
                     "author": "Чесніший Денис Юрійович",
-                    "technology": ["Python", "Flask", "Pandas", "Scikit-learn", "SQLite", "Bootstrap", "Chart.js"],
+                    "technology": ["Python", "Flask", "Pandas", "Scikit-learn", "SQLite", "HTML", "CSS", "Canvas API"],
                     "model_status": "trained" if (ROOT_DIR / "models" / "demand_model.joblib").exists() else "not_trained",
                     "products_count": len(get_products()) if DEFAULT_DATA_PATH.exists() else 0,
                 },
@@ -178,7 +193,7 @@ def create_app() -> Flask:
     def api_chart_data(product_id: int):
         sales = load_sales_data(DEFAULT_DATA_PATH)
         product_sales = sales[sales["product_id"] == product_id].sort_values("date").tail(45)
-        forecast = forecast_product(product_id, days=14)
+        forecast = forecast_product(product_id, days=14, persist=False)
         return jsonify(
             {
                 "status": "success",
@@ -200,8 +215,10 @@ def create_app() -> Flask:
         try:
             data = pd.read_csv(uploaded_file)
             save_uploaded_dataset(data)
+            clear_data_cache()
             seed_from_csv()
             metrics = train_model()
+            clear_model_cache()
         except Exception as exc:
             return jsonify({"status": "error", "message": f"Не вдалося обробити CSV: {exc}"}), 400
 

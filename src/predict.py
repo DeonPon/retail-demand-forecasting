@@ -1,4 +1,5 @@
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import joblib
@@ -26,6 +27,7 @@ class NotEnoughDataError(ValueError):
     pass
 
 
+@lru_cache(maxsize=1)
 def load_model_artifact() -> dict:
     if not MODEL_PATH.exists():
         raise ModelNotTrainedError("Модель ще не навчена. Виконайте перенавчання моделі.")
@@ -42,7 +44,12 @@ def get_products() -> list[dict]:
     return get_product_catalog(DEFAULT_DATA_PATH).to_dict("records")
 
 
-def forecast_product(product_id: int, days: int = 14, persist: bool = True) -> dict:
+def clear_model_cache() -> None:
+    load_model_artifact.cache_clear()
+    _forecast_product_cached.cache_clear()
+
+
+def _build_forecast(product_id: int, days: int, persist: bool) -> dict:
     artifact = load_model_artifact()
     model = artifact["model"]
     category_mapping = artifact["category_mapping"]
@@ -94,6 +101,17 @@ def forecast_product(product_id: int, days: int = 14, persist: bool = True) -> d
         "forecast_days": int(days),
         "forecast": forecast_rows,
     }
+
+
+@lru_cache(maxsize=128)
+def _forecast_product_cached(product_id: int, days: int) -> dict:
+    return _build_forecast(product_id, days, persist=False)
+
+
+def forecast_product(product_id: int, days: int = 14, persist: bool = False) -> dict:
+    if persist:
+        return _build_forecast(product_id, days, persist=True)
+    return _forecast_product_cached(product_id, days)
 
 
 def total_forecast_for_product(product_id: int, days: int = 14) -> float:

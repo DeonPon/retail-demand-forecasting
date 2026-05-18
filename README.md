@@ -37,8 +37,8 @@
 - NumPy;
 - Scikit-learn;
 - SQLite;
-- HTML/CSS/Bootstrap;
-- Chart.js;
+- HTML/CSS;
+- Canvas API для графіка без зовнішніх frontend-залежностей;
 - Gunicorn.
 
 ## Структура проєкту

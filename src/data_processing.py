@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import lru_cache
 
 import pandas as pd
 
@@ -36,6 +37,7 @@ def validate_sales_dataframe(data: pd.DataFrame) -> None:
         raise ValueError(f"У CSV відсутні обов'язкові колонки: {missing_list}")
 
 
+@lru_cache(maxsize=4)
 def load_sales_data(path: Path = DEFAULT_DATA_PATH) -> pd.DataFrame:
     """Завантажує продажі з CSV, перевіряє структуру та приводить типи."""
     if not path.exists():
@@ -68,12 +70,17 @@ def load_sales_data(path: Path = DEFAULT_DATA_PATH) -> pd.DataFrame:
     return data.sort_values(["product_id", "date"]).reset_index(drop=True)
 
 
+def clear_data_cache() -> None:
+    load_sales_data.cache_clear()
+
+
 def save_uploaded_dataset(data: pd.DataFrame, path: Path = DEFAULT_DATA_PATH) -> None:
     """Зберігає новий CSV після перевірки структури."""
     data = normalize_legacy_columns(data)
     validate_sales_dataframe(data)
     path.parent.mkdir(parents=True, exist_ok=True)
     data.to_csv(path, index=False, encoding="utf-8")
+    clear_data_cache()
 
 
 def get_product_catalog(path: Path = DEFAULT_DATA_PATH) -> pd.DataFrame:
