@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Прогноз | Retail Demand AI{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="eyebrow">ML-модель</p><h1>Прогноз попиту</h1></div>
+  <form method="get" class="d-flex gap-2">
+    <select class="form-select form-select-sm" name="product_id">
+      {% for product in products %}
+        <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-primary btn-sm">Показати</button>
+  </form>
+</header>
+<section class="panel">
+  <h2>{{ forecast.product_name }}</h2>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th>Дата</th><th>Прогнозована кількість</th></tr></thead>
+      <tbody>
+      {% for row in forecast.forecast %}
+        <tr><td>{{ row.date }}</td><td>{{ row.predicted_quantity }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

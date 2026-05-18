@@ -1,0 +1,8 @@
+{
+  "MAE": 7.349,
+  "RMSE": 11.001,
+  "MAPE": 19.852,
+  "train_rows": 2268,
+  "test_rows": 564,
+  "model": "RandomForestRegressor"
+}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Товари | Retail Demand AI{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">Каталог</p><h1>Товари</h1></div></header>
+<section class="panel">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>ID</th><th>Назва</th><th>Категорія</th><th>Ціна</th><th>Залишок</th></tr></thead>
+      <tbody>
+      {% for product in products %}
+        <tr>
+          <td>{{ product.product_id }}</td>
+          <td>{{ product.product_name }}</td>
+          <td>{{ product.category }}</td>
+          <td>{{ product.price }}</td>
+          <td>{{ product.stock_quantity }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Закупівлі | Retail Demand AI{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">Автоматизація ритейлу</p><h1>Рекомендації закупівель</h1></div></header>
+<section class="cards-grid">
+  {% for item in recommendations %}
+  <article class="panel recommendation-card">
+    <span>{{ item.product_name }}</span>
+    <strong>{{ item.recommended_order_quantity }} од.</strong>
+    <p>{{ item.explanation }}</p>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

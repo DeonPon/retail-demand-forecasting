@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Retail Demand AI{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Аналітична панель</p>
+    <h1>Прогнозування попиту та закупівель</h1>
+  </div>
+  <form class="upload-form" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
+    <input class="form-control form-control-sm" type="file" name="file" accept=".csv">
+    <button class="btn btn-primary btn-sm" type="submit">Оновити CSV</button>
+  </form>
+</header>
+
+<section class="kpi-grid">
+  <div class="kpi-card"><span>Товарів</span><strong>{{ products|length }}</strong></div>
+  <div class="kpi-card"><span>Середній прогноз</span><strong>{{ average_forecast }}</strong></div>
+  <div class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong></div>
+  <div class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong></div>
+  <div class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong></div>
+  <div class="kpi-card accent"><span>Потребують закупівлі</span><strong>{{ products_to_order }}</strong></div>
+</section>
+
+<section class="content-grid">
+  <div class="panel wide">
+    <div class="panel-heading">
+      <div>
+        <h2>{{ forecast.product_name }}</h2>
+        <p>Фактичні продажі за останні 45 днів і прогноз на 14 днів</p>
+      </div>
+      <form method="get">
+        <select class="form-select form-select-sm" name="product_id" onchange="this.form.submit()">
+          {% for product in products %}
+            <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+    <canvas id="demandChart" data-product-id="{{ selected_product }}"></canvas>
+  </div>
+
+  <div class="panel recommendation-panel">
+    <h2>Рекомендація закупівлі</h2>
+    <strong>{{ recommendation.recommended_order_quantity }} од.</strong>
+    <p>{{ recommendation.explanation }}</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <h2>Товари та прогноз</h2>
+      <p>Коротка таблиця для менеджера закупівель</p>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Товар</th><th>Категорія</th><th>Залишок</th><th>Прогноз 14 днів</th><th>Закупити</th></tr></thead>
+      <tbody>
+      {% for item in recommendations %}
+        <tr>
+          <td>{{ item.product_name }}</td>
+          <td>{{ products[loop.index0].category }}</td>
+          <td>{{ item.current_stock }}</td>
+          <td>{{ item.forecast_total }}</td>
+          <td><span class="badge text-bg-{{ 'primary' if item.recommended_order_quantity > 0 else 'secondary' }}">{{ item.recommended_order_quantity }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Метрики | Retail Demand AI{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">Якість моделі</p><h1>Метрики прогнозування</h1></div></header>
+<section class="kpi-grid compact">
+  <div class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong><p>Середня абсолютна помилка в одиницях товару.</p></div>
+  <div class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong><p>Помилка, чутлива до великих відхилень.</p></div>
+  <div class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>Середня відносна помилка у відсотках.</p></div>
+</section>
+<section class="panel">
+  <h2>Параметри експерименту</h2>
+  <p>Модель: {{ metrics.get('model', 'RandomForestRegressor') }}. Навчальних рядків: {{ metrics.get('train_rows', '-') }}. Тестових рядків: {{ metrics.get('test_rows', '-') }}.</p>
+</section>
+{% endblock %}
