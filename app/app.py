@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
-from flask import Flask, jsonify, make_response, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, jsonify, make_response, redirect, render_template, request, session, url_for
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -19,12 +19,66 @@ sys.path.append(str(ROOT_DIR / "app" / "auth"))
 
 from auth import authenticate, login_required
 from catalog import get_category_names
-from data_processing import DEFAULT_DATA_PATH, REQUIRED_COLUMNS, clear_data_cache, get_product_catalog, load_sales_data, save_uploaded_dataset
+from data_processing import DEFAULT_DATA_PATH, REQUIRED_COLUMNS, clear_data_cache, load_sales_data, save_uploaded_dataset
 from database import DATABASE_PATH, get_import_history, get_product_detail, get_system_overview, import_sales_dataframe, initialize_database, log_import
 from generate_dataset import main as generate_dataset
 from predict import METRICS_PATH, MODEL_PATH, ModelNotTrainedError, NotEnoughDataError, ProductNotFoundError, clear_model_cache, forecast_product, get_metrics, get_products
 from recommendations import clear_recommendations_cache, exportable_recommendations, list_recommendations, purchase_recommendation
 from train_model import train_model
+
+
+FEATURE_LABELS = {
+    "lag_1": "продажі за попередній день",
+    "lag_7": "продажі за попередній тиждень",
+    "lag_14": "продажі за попередні 14 днів",
+    "rolling_mean_7": "середні продажі за 7 днів",
+    "rolling_mean_14": "середні продажі за 14 днів",
+    "promo": "акційний період",
+    "price": "ціна товару",
+    "stock_quantity": "залишок товару",
+    "base_demand": "базовий попит категорії",
+    "is_weekend": "вихідний день",
+    "day_of_week": "день тижня",
+    "supplier_delay_days": "затримка постачальника",
+}
+
+
+def humanize_feature_importance(items: list[dict]) -> list[dict]:
+    return [{**item, "label": FEATURE_LABELS.get(item.get("feature", ""), item.get("feature", ""))} for item in items]
+
+
+def forecast_day_meta(date_value: str) -> dict:
+    date = pd.to_datetime(date_value)
+    if date.dayofweek >= 5:
+        return {"day_type": "вихідний", "comment": "можливе відхилення через поведінку покупців у вихідні"}
+    if date.month in {6, 7, 8, 12}:
+        return {"day_type": "робочий", "comment": "можливий сезонний вплив"}
+    return {"day_type": "робочий", "comment": "звичайний день без додаткового сезонного маркера"}
+
+
+@lru_cache(maxsize=1)
+def get_demo_product_id() -> int:
+    data = load_sales_data(DEFAULT_DATA_PATH)
+    candidates = []
+    for product_id, group in data.sort_values("date").groupby("product_id"):
+        if len(group) < 60:
+            continue
+        sales = group["sales_quantity"].astype(float)
+        mean_sales = float(sales.mean())
+        if mean_sales <= 0:
+            continue
+        recent = group.tail(60)
+        first_period = float(recent.head(30)["sales_quantity"].mean())
+        last_period = float(recent.tail(30)["sales_quantity"].mean())
+        variation = float(recent["sales_quantity"].std() or 0.0) / max(float(recent["sales_quantity"].mean()), 1.0)
+        trend_strength = abs(last_period - first_period) / max(mean_sales, 1.0)
+        promo_signal = float(recent["promo"].astype(int).sum()) / max(len(recent), 1)
+        score = trend_strength + min(variation, 0.8) * 0.7 + promo_signal * 0.4
+        if 0.08 <= variation <= 0.75:
+            candidates.append((score, int(product_id)))
+    if not candidates:
+        return 9
+    return max(candidates)[1]
 
 
 def create_app() -> Flask:
@@ -37,47 +91,7 @@ def create_app() -> Flask:
         clear_data_cache()
         clear_model_cache()
         clear_recommendations_cache()
-        build_dashboard_summary.cache_clear()
-
-    @lru_cache(maxsize=8)
-    def build_dashboard_summary(days: int = 14) -> dict:
-        history = load_sales_data(DEFAULT_DATA_PATH)
-        catalog = get_product_catalog(DEFAULT_DATA_PATH)
-        recent = history.groupby("product_id").tail(14)
-        avg_7_map = history.groupby("product_id").tail(7).groupby("product_id")["sales_quantity"].mean().to_dict()
-        avg_14 = recent.groupby("product_id")["sales_quantity"].mean().to_dict()
-
-        items = []
-        for row in catalog.to_dict("records"):
-            avg7 = float(avg_7_map.get(row["product_id"], 0))
-            avg14 = float(avg_14.get(row["product_id"], avg7))
-            simple_forecast = round(avg14 * days, 2)
-            recommended = max(0, round(simple_forecast + avg7 * 3 - float(row["stock_quantity"])))
-            cover_days = round(float(row["stock_quantity"]) / max(avg7, 1), 1)
-            priority = "високий" if recommended > 0 and cover_days < 5 else "середній" if recommended > 0 and cover_days < 10 else "низький"
-            items.append(
-                {
-                    "product_id": int(row["product_id"]),
-                    "product_name": row["product_name"],
-                    "product_icon": row.get("product_icon", "📦"),
-                    "current_stock": round(float(row["stock_quantity"]), 2),
-                    "forecast_total": simple_forecast,
-                    "recommended_order_quantity": int(recommended),
-                    "stock_cover_days": cover_days,
-                    "priority": priority,
-                }
-            )
-
-        top_to_buy = sorted([item for item in items if item["recommended_order_quantity"] > 0], key=lambda item: -item["recommended_order_quantity"])[:10]
-        risk_items = sorted(items, key=lambda item: item["stock_cover_days"])[:10]
-        average_forecast = round(sum(item["forecast_total"] for item in items) / max(len(items), 1), 2)
-        return {
-            "items": items,
-            "top_to_buy": top_to_buy,
-            "risk_items": risk_items,
-            "average_forecast": average_forecast,
-            "products_to_order": sum(1 for item in items if item["recommended_order_quantity"] > 0),
-        }
+        get_demo_product_id.cache_clear()
 
     def set_notice(message: str, level: str = "info") -> None:
         session["notice"] = {"message": message, "level": level}
@@ -112,18 +126,15 @@ def create_app() -> Flask:
         products = get_products()
         product_ids = {product["product_id"] for product in products}
         if selected_product not in product_ids and products:
-            selected_product = int(products[0]["product_id"])
+            selected_product = get_demo_product_id()
 
         metrics = get_metrics()
         overview = get_system_overview()
         imports = get_import_history(limit=5)
-        summary = build_dashboard_summary(days=days)
         forecast_error = None
-        recommendation = None
 
         try:
             forecast = forecast_product(selected_product, days=days, persist=False)
-            recommendation = purchase_recommendation(selected_product, days=days, persist_forecast=False)
         except Exception:
             app.logger.exception("Помилка побудови прогнозу для dashboard")
             selected_name = next((product["product_name"] for product in products if product["product_id"] == selected_product), "Товар")
@@ -135,15 +146,11 @@ def create_app() -> Flask:
             "selected_product": selected_product,
             "forecast": forecast,
             "forecast_error": forecast_error,
-            "recommendation": recommendation,
             "metrics": metrics,
             "overview": overview,
             "imports": imports,
-            "top_to_buy": summary["top_to_buy"],
-            "risk_items": summary["risk_items"],
             "feature_importance": metrics.get("feature_importance", []),
-            "average_forecast": summary["average_forecast"],
-            "products_to_order": summary["products_to_order"],
+            "human_feature_importance": humanize_feature_importance(metrics.get("feature_importance", [])),
             "notice": pop_notice(),
         }
 
@@ -191,41 +198,48 @@ def create_app() -> Flask:
         return redirect(url_for("login"))
 
     @app.route("/")
-    @login_required
     def dashboard():
-        selected_product = int(request.args.get("product_id", 1))
+        selected_product = int(request.args.get("product_id", get_demo_product_id()))
         return render_template("dashboard.html", **build_dashboard_context(selected_product))
 
+    @app.route("/dataset")
     @app.route("/products")
-    @login_required
     def products_page():
         query = request.args.get("q", "").strip().lower()
         category = request.args.get("category", "")
-        sort = request.args.get("sort", "stock_asc")
-        days = int(request.args.get("days", 14))
-        catalog = get_product_catalog()
-        recommendations_map = {item["product_id"]: item for item in list_recommendations(days=days)}
+        sort = request.args.get("sort", "demand_desc")
         history = load_sales_data(DEFAULT_DATA_PATH)
-        recent_avg = history.groupby("product_id").tail(7).groupby("product_id")["sales_quantity"].mean().to_dict()
-
+        dataset_summary = {
+            "date_from": history["date"].min().date().isoformat(),
+            "date_to": history["date"].max().date().isoformat(),
+            "products_count": int(history["product_id"].nunique()),
+            "categories_count": int(history["category"].nunique()),
+            "sales_rows_count": int(len(history)),
+            "average_daily_demand": round(float(history["sales_quantity"].mean()), 2),
+        }
+        grouped = (
+            history.groupby(["product_id", "product_name", "category"], as_index=False)
+            .agg(
+                average_price=("price", "mean"),
+                records_count=("sales_quantity", "count"),
+                average_daily_demand=("sales_quantity", "mean"),
+                min_sales=("sales_quantity", "min"),
+                max_sales=("sales_quantity", "max"),
+                date_from=("date", "min"),
+                date_to=("date", "max"),
+            )
+        )
         products = []
-        for row in catalog.to_dict("records"):
-            recommendation = recommendations_map.get(row["product_id"], {})
-            avg_7 = round(float(recent_avg.get(row["product_id"], 0)), 2)
-            status_tags = []
-            if row["stock_quantity"] < max(avg_7 * 4, row["base_demand"] * 2):
-                status_tags.append("низький залишок")
-            if recommendation.get("recommended_order_quantity", 0) > 0:
-                status_tags.append("потребує закупівлі")
-            if avg_7 >= row["base_demand"] * 0.95:
-                status_tags.append("стабільний попит")
+        for row in grouped.to_dict("records"):
             products.append(
                 {
                     **row,
-                    "avg_sales_7": avg_7,
-                    "forecast_14": recommendation.get("forecast_total", 0),
-                    "recommended_order_quantity": recommendation.get("recommended_order_quantity", 0),
-                    "status_tags": status_tags,
+                    "average_price": round(float(row["average_price"]), 2),
+                    "average_daily_demand": round(float(row["average_daily_demand"]), 2),
+                    "min_sales": round(float(row["min_sales"]), 2),
+                    "max_sales": round(float(row["max_sales"]), 2),
+                    "date_from": pd.Timestamp(row["date_from"]).date().isoformat(),
+                    "date_to": pd.Timestamp(row["date_to"]).date().isoformat(),
                 }
             )
 
@@ -236,58 +250,59 @@ def create_app() -> Flask:
 
         sort_options = {
             "name": lambda item: item["product_name"],
-            "stock_asc": lambda item: item["stock_quantity"],
-            "stock_desc": lambda item: -item["stock_quantity"],
-            "forecast_desc": lambda item: -item["forecast_14"],
+            "demand_desc": lambda item: -item["average_daily_demand"],
+            "demand_asc": lambda item: item["average_daily_demand"],
+            "records_desc": lambda item: -item["records_count"],
+            "price_desc": lambda item: -item["average_price"],
         }
-        products = sorted(products, key=sort_options.get(sort, sort_options["stock_asc"]))
-        return render_template("products.html", products=products, categories=get_category_names(), selected_category=category, query=request.args.get("q", ""), selected_sort=sort)
+        products = sorted(products, key=sort_options.get(sort, sort_options["demand_desc"]))
+        return render_template("products.html", products=products, dataset_summary=dataset_summary, categories=get_category_names(), selected_category=category, query=request.args.get("q", ""), selected_sort=sort, notice=pop_notice())
 
     @app.route("/forecast")
-    @login_required
     def forecast_page():
         products = get_products()
         days = int(request.args.get("days", 14))
-        selected_product = int(request.args.get("product_id", products[0]["product_id"] if products else 1))
+        selected_product = int(request.args.get("product_id", products[8]["product_id"] if len(products) > 8 else products[0]["product_id"] if products else 1))
         forecast = forecast_product(selected_product, days=days, persist=False)
+        forecast["forecast"] = [{**row, **forecast_day_meta(row["date"])} for row in forecast["forecast"]]
+        forecast["feature_importance_human"] = humanize_feature_importance(forecast.get("feature_importance", []))
         return render_template("forecast.html", products=products, selected_product=selected_product, days=days, forecast=forecast, metrics=get_metrics())
 
     @app.route("/recommendations")
-    @login_required
     def recommendations_page():
         days = int(request.args.get("days", 14))
         recommendations = list_recommendations(days=days)
         return render_template("recommendations.html", recommendations=recommendations, days=days)
 
     @app.route("/recommendations/export.csv")
-    @login_required
     def recommendations_export():
         days = int(request.args.get("days", 14))
         frame = pd.DataFrame(exportable_recommendations(days=days))
         csv_buffer = io.StringIO()
         frame.to_csv(csv_buffer, index=False)
-        response = make_response(csv_buffer.getvalue())
-        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+        response = make_response("\ufeff" + csv_buffer.getvalue())
+        response.headers["Content-Type"] = "text/csv; charset=utf-8-sig"
         response.headers["Content-Disposition"] = "attachment; filename=recommendations.csv"
         return response
 
     @app.route("/metrics")
-    @login_required
     def metrics_page():
-        return render_template("metrics.html", metrics=get_metrics(), overview=get_system_overview(), imports=get_import_history(limit=5))
+        metrics = get_metrics()
+        return render_template("metrics.html", metrics=metrics, human_feature_importance=humanize_feature_importance(metrics.get("feature_importance", [])[:7]), overview=get_system_overview(), imports=get_import_history(limit=5))
 
     @app.route("/about")
-    @login_required
     def about_page():
         return render_template("about.html", metrics=get_metrics(), overview=get_system_overview())
 
     @app.route("/download/sample-csv")
-    @login_required
     def download_sample_csv():
-        return send_file(DEFAULT_DATA_PATH, as_attachment=True, download_name="sales_sample.csv")
+        csv_text = DEFAULT_DATA_PATH.read_text(encoding="utf-8")
+        response = make_response("\ufeff" + csv_text)
+        response.headers["Content-Type"] = "text/csv; charset=utf-8-sig"
+        response.headers["Content-Disposition"] = "attachment; filename=sales_sample_excel.csv"
+        return response
 
     @app.route("/upload", methods=["POST"])
-    @login_required
     def upload_from_form():
         payload, status = upload_dataset(run_training=True)
         set_notice(payload.get_json().get("message", "Операцію виконано."), "success" if status < 400 else "error")
@@ -398,7 +413,7 @@ def create_app() -> Flask:
             if run_training:
                 metrics = train_model()
                 reset_runtime_caches()
-            message = imported["message"] if not metrics else imported["message"].replace("готова до перенавчання", "перенавчена і готова до роботи")
+            message = imported["message"] if not metrics else imported["message"] + " Прогноз сформовано на основі оновленої моделі."
             return jsonify({"status": "success", "message": message, "import": imported, "metrics": metrics}), 200
         except Exception as exc:
             app.logger.exception("Помилка імпорту CSV")

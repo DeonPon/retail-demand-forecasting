@@ -3,14 +3,14 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Прогноз попиту</p>
-    <h1>Прогноз по окремому товару</h1>
-    <p class="page-summary">Сторінка показує історію фактичних продажів, майбутній прогноз попиту та пояснення, чому система сформувала саме такий результат.</p>
+    <p class="eyebrow">Прогноз</p>
+    <h1>Прогноз попиту</h1>
+    <p class="page-summary">Оберіть товар і період прогнозування. Система побудує прогноз очікуваного попиту на основі історичних продажів і сформованих ознак.</p>
   </div>
-  <form method="get" class="filters-row compact">
+  <form method="get" class="filters-row compact forecast-controls">
     <select class="form-select" name="product_id">
       {% for product in products %}
-      <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_icon }} {{ product.product_name }}</option>
+      <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
       {% endfor %}
     </select>
     <select class="form-select" name="days">
@@ -18,81 +18,85 @@
       <option value="{{ option }}" {% if option == days %}selected{% endif %}>{{ option }} днів</option>
       {% endfor %}
     </select>
-    <button class="btn btn-primary" type="submit">Оновити прогноз</button>
+    <button class="btn btn-primary" type="submit">Побудувати прогноз</button>
   </form>
 </header>
 
-<section class="alert alert-success">
-  Прогноз сформовано на період після останньої доступної дати продажів: {{ forecast.forecast_start_date }} — {{ forecast.forecast_end_date }}.
+<section class="panel forecast-intro">
+  <div>
+    <p class="eyebrow">Що показує прогноз</p>
+    <h2>Оцінка майбутнього попиту для вибраного товару</h2>
+    <p>Прогноз показує очікуваний попит на вибраний товар у майбутньому періоді на основі історичних продажів і сформованих ознак.</p>
+  </div>
+  <div class="trend-card">
+    <span>Тип динаміки</span>
+    <strong>{{ forecast.trend_label }}</strong>
+    <p>{{ forecast.trend_note }}</p>
+  </div>
 </section>
 
-<section class="content-grid dashboard-grid">
-  <article class="panel chart-panel">
-    <div class="panel-heading">
-      <div>
-        <h2>{{ forecast.product_name }}</h2>
-        <p>Фактичні продажі за останні 60 днів і прогноз на майбутній період без накладання на історію.</p>
-      </div>
+<section class="panel chart-panel forecast-chart-panel">
+  <div class="panel-heading">
+    <div>
+      <h2>{{ forecast.product_name }}</h2>
+      <p>Історія продажів завершується {{ forecast.history_last_date }}, прогноз починається з {{ forecast.forecast_start_date }}.</p>
     </div>
-    <div class="chart-wrap">
-      <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="{{ days }}"></canvas>
-      <div id="chartFallback" class="chart-fallback">Графік тимчасово недоступний. Нижче залишається таблиця прогнозу та текстове пояснення.</div>
-    </div>
-  </article>
-
-  <article class="panel side-panel">
-    <h2>Пояснення прогнозу</h2>
-    <p>{{ forecast.plain_explanation }}</p>
-    <div class="info-stack">
-      <div><span class="hint-label">Середній прогноз</span><strong>{{ forecast.forecast_avg }}</strong></div>
-      <div><span class="hint-label">Мінімум</span><strong>{{ forecast.forecast_min }}</strong></div>
-      <div><span class="hint-label">Максимум</span><strong>{{ forecast.forecast_max }}</strong></div>
-      <div><span class="hint-label">Тренд</span><strong>{{ forecast.trend }}</strong></div>
-    </div>
-  </article>
+  </div>
+  <div class="chart-wrap chart-wrap-large">
+    <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="{{ days }}" title="Синя лінія показує історію, зелена пунктирна — прогноз після останньої історичної дати."></canvas>
+    <div id="chartFallback" class="chart-fallback">Графік тимчасово недоступний. Нижче залишається таблиця прогнозу та текстове пояснення.</div>
+  </div>
 </section>
 
-<section class="tri-grid">
+<section class="content-grid">
   <article class="panel">
-    <h2>Фактори впливу на прогноз</h2>
+    <h2>Короткий висновок</h2>
+    <p>Модель прогнозує сумарний попит <strong>{{ forecast.forecast_total }} одиниць</strong> на наступні {{ days }} днів. Середній прогнозований попит становить <strong>{{ forecast.forecast_avg }} одиниці на день</strong>. Динаміка оцінюється як <strong>{{ forecast.trend_label }}</strong>.</p>
+  </article>
+
+  <article class="panel">
+    <h2>Інтерпретація</h2>
+    <p>{{ forecast.trend_note }}</p>
+    <p class="muted">Окремі коливання прогнозу пов’язані з календарними ознаками та попередньою динамікою продажів. Рівний прогноз є очікуваним для товарів зі стабільними історичними продажами.</p>
+  </article>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <h2>Фактори впливу</h2>
     <ul class="plain-list">
-      {% for factor in forecast.factors %}
+      {% for factor in forecast.factors[:5] %}
       <li>{{ factor }}</li>
       {% endfor %}
     </ul>
   </article>
 
   <article class="panel">
-    <h2>Важливість ознак моделі</h2>
-    <div class="chart-wrap chart-wrap-small">
-      <canvas id="importanceChart" data-chart="importance" data-importance='{{ forecast.feature_importance | tojson }}'></canvas>
-      <div id="importanceFallback" class="chart-fallback">Список важливих ознак доступний нижче.</div>
-    </div>
-    <div class="tag-row">
-      {% for item in forecast.feature_importance[:5] %}
-      <span class="chip chip-neutral">{{ item.feature }}: {{ item.importance }}</span>
-      {% endfor %}
-    </div>
-  </article>
-
-  <article class="panel">
-    <h2>Підсумок прогнозу</h2>
-    <p>Очікуваний попит за {{ days }} днів: <strong>{{ forecast.forecast_total }}</strong> од.</p>
-    <p>Модель: <strong>{{ metrics.get('best_model_name', '—') }}</strong></p>
-    <p>MAPE: <strong>{{ metrics.get('MAPE', '—') }}%</strong></p>
+    <h2>Як читати графік</h2>
+    <p>Синя лінія показує фактичні продажі, вертикальна межа — початок прогнозу, зелена пунктирна лінія — прогноз майбутніх значень після останньої дати в історії.</p>
   </article>
 </section>
 
+<section class="panel value-panel">
+  <div>
+    <p class="eyebrow">Як використовувати результат</p>
+    <h2>Використання прогнозу в ритейлі</h2>
+  </div>
+  <p>Отриманий прогноз може бути використаний для попереднього планування запасів, аналізу тенденцій та оцінки ризику зміни попиту.</p>
+</section>
+
 <section class="panel">
-  <h2>Прогноз по майбутніх датах</h2>
+  <h2>Таблиця прогнозу по днях</h2>
   <div class="table-responsive">
-    <table class="table table-sm">
-      <thead><tr><th>Дата</th><th>Прогнозована кількість</th></tr></thead>
+    <table class="table table-sm forecast-table">
+      <thead><tr><th>Дата</th><th>Прогноз</th><th>Тип дня</th><th>Коментар</th></tr></thead>
       <tbody>
       {% for row in forecast.forecast %}
         <tr>
           <td>{{ row.date }}</td>
-          <td>{{ row.predicted_quantity }}</td>
+          <td>{{ row.predicted_quantity }} од.</td>
+          <td>{{ row.day_type }}</td>
+          <td>{{ row.comment }}</td>
         </tr>
       {% endfor %}
       </tbody>

@@ -1,13 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Товари | Retail Demand Sense{% endblock %}
+{% block title %}Дані | Retail Demand Sense{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Каталог</p>
-    <h1>Товари ритейлу</h1>
-    <p class="page-summary">Сторінка допомагає швидко знайти товар, оцінити його залишок, середній попит і перейти до детального прогнозу.</p>
+    <p class="eyebrow">Набір даних</p>
+    <h1>Набір даних для прогнозування</h1>
+    <p class="page-summary">Цей розділ демонструє структуру вхідного набору даних, який використовується для навчання моделі прогнозування. Кожен запис містить дату продажу, товар, категорію, ціну, кількість проданих одиниць та допоміжні ознаки.</p>
   </div>
 </header>
+
+{% if notice %}
+<section class="alert {% if notice.level == 'error' %}alert-danger{% else %}alert-success{% endif %}">
+  {{ notice.message }}
+</section>
+{% endif %}
+
+<section class="kpi-grid kpi-grid-large">
+  <article class="kpi-card"><span>Історичний період</span><strong>{{ dataset_summary.date_from }} — {{ dataset_summary.date_to }}</strong></article>
+  <article class="kpi-card"><span>Товарів</span><strong>{{ dataset_summary.products_count }}</strong></article>
+  <article class="kpi-card"><span>Категорій</span><strong>{{ dataset_summary.categories_count }}</strong></article>
+  <article class="kpi-card"><span>Записів продажів</span><strong>{{ dataset_summary.sales_rows_count }}</strong></article>
+  <article class="kpi-card"><span>Середній денний попит</span><strong>{{ dataset_summary.average_daily_demand }} од.</strong></article>
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <h2>Структура даних</h2>
+      <p>Набір даних описує історичні продажі товарів і ознаки, які використовуються під час побудови прогнозу.</p>
+    </div>
+  </div>
+  <div class="data-structure-grid">
+    <span>дата продажу</span>
+    <span>назва товару</span>
+    <span>категорія</span>
+    <span>ціна</span>
+    <span>кількість продажів</span>
+    <span>календарні ознаки</span>
+    <span>допоміжні характеристики</span>
+  </div>
+</section>
+
+<section class="panel import-panel">
+  <div>
+    <h2>Імпорт набору даних</h2>
+    <p>CSV-файл містить історичні записи продажів. Після завантаження дані очищуються, нормалізуються та використовуються для побудови прогнозу.</p>
+  </div>
+  <div class="header-actions">
+    <form class="upload-form custom-upload" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
+      <label class="file-picker">
+        <input type="file" name="file" accept=".csv" required data-file-input>
+        <span>Обрати CSV-файл</span>
+      </label>
+      <span class="file-name" data-file-name>Файл ще не обрано</span>
+      <button class="btn btn-primary btn-sm" type="submit" data-loading-text="Завантажуємо...">Завантажити</button>
+    </form>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('download_sample_csv') }}">Завантажити приклад CSV</a>
+  </div>
+</section>
 
 <section class="panel filter-panel">
   <form class="filters-row" method="get">
@@ -19,9 +69,10 @@
       {% endfor %}
     </select>
     <select class="form-select" name="sort">
-      <option value="stock_asc" {% if selected_sort == 'stock_asc' %}selected{% endif %}>Залишок: зростання</option>
-      <option value="stock_desc" {% if selected_sort == 'stock_desc' %}selected{% endif %}>Залишок: спадання</option>
-      <option value="forecast_desc" {% if selected_sort == 'forecast_desc' %}selected{% endif %}>Прогноз: спадання</option>
+      <option value="demand_desc" {% if selected_sort == 'demand_desc' %}selected{% endif %}>Попит: спадання</option>
+      <option value="demand_asc" {% if selected_sort == 'demand_asc' %}selected{% endif %}>Попит: зростання</option>
+      <option value="records_desc" {% if selected_sort == 'records_desc' %}selected{% endif %}>Більше записів</option>
+      <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Ціна: спадання</option>
       <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Назва</option>
     </select>
     <button class="btn btn-primary" type="submit">Застосувати</button>
@@ -29,42 +80,33 @@
 </section>
 
 <section class="panel">
+  <p class="table-caption">Товари впорядковані за вибраним фільтром. Для кожної позиції показано базову статистику продажів, на якій будується прогноз.</p>
   {% if products %}
   <div class="table-responsive">
-    <table class="table table-hover align-middle">
+    <table class="table table-hover dataset-table">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Іконка</th>
-          <th>Назва</th>
+          <th>Товар</th>
           <th>Категорія</th>
-          <th>Ціна</th>
-          <th>Залишок</th>
-          <th>Сер. продаж 7 днів</th>
-          <th>Прогноз 14 днів</th>
-          <th>Статус</th>
-          <th></th>
+          <th>Середня ціна</th>
+          <th>Середній денний попит</th>
+          <th>Мін / макс продажі</th>
+          <th>Записів</th>
+          <th>Історичний період</th>
+          <th>Прогноз</th>
         </tr>
       </thead>
       <tbody>
         {% for product in products %}
         <tr>
-          <td>{{ product.product_id }}</td>
-          <td><span class="product-icon">{{ product.product_icon }}</span></td>
-          <td>{{ product.product_name }}</td>
+          <td><strong>{{ product.product_name }}</strong></td>
           <td>{{ product.category }}</td>
-          <td>{{ product.price }}</td>
-          <td>{{ product.stock_quantity }}</td>
-          <td>{{ product.avg_sales_7 }}</td>
-          <td>{{ product.forecast_14 }}</td>
-          <td>
-            <div class="tag-row">
-              {% for tag in product.status_tags %}
-              <span class="chip {% if tag == 'низький залишок' %}chip-danger{% elif tag == 'потребує закупівлі' %}chip-warn{% else %}chip-ok{% endif %}">{{ tag }}</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td><a class="btn btn-secondary btn-sm" href="{{ url_for('forecast_page', product_id=product.product_id) }}">Прогноз</a></td>
+          <td>{{ product.average_price }} грн</td>
+          <td>{{ product.average_daily_demand }} од.</td>
+          <td>{{ product.min_sales }} / {{ product.max_sales }}</td>
+          <td>{{ product.records_count }}</td>
+          <td>{{ product.date_from }} — {{ product.date_to }}</td>
+          <td><a class="btn btn-secondary btn-sm" href="{{ url_for('forecast_page', product_id=product.product_id) }}">Побудувати прогноз</a></td>
         </tr>
         {% endfor %}
       </tbody>

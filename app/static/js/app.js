@@ -9,6 +9,16 @@ function setLoadingStates() {
   });
 }
 
+function setFilePickerLabels() {
+  document.querySelectorAll("[data-file-input]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const label = input.closest("form")?.querySelector("[data-file-name]");
+      if (!label) return;
+      label.textContent = input.files && input.files.length ? input.files[0].name : "Файл ще не обрано";
+    });
+  });
+}
+
 function showChartFallback(id) {
   const fallback = document.getElementById(id);
   if (fallback) fallback.classList.add("visible");
@@ -100,7 +110,7 @@ function drawDemandChart(canvas, payload) {
 
   if (forecastStartIndex < labels.length) {
     const xStart = toX(forecastStartIndex);
-    ctx.fillStyle = "rgba(15, 140, 99, 0.05)";
+    ctx.fillStyle = "rgba(15, 140, 99, 0.04)";
     ctx.fillRect(xStart, padding.top, width - padding.right - xStart, plotHeight);
 
     ctx.save();
@@ -113,16 +123,11 @@ function drawDemandChart(canvas, payload) {
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = "#607089";
+    ctx.font = "600 13px 'Segoe UI', sans-serif";
+    ctx.fillStyle = "#42526f";
     ctx.fillText("Початок прогнозу", Math.min(xStart + 6, width - 130), padding.top + 14);
+    ctx.font = "12px 'Segoe UI', sans-serif";
   }
-
-  history.forEach((item, index) => {
-    if (!item.promo) return;
-    const x = toX(index);
-    ctx.fillStyle = "rgba(245, 158, 11, 0.08)";
-    ctx.fillRect(x - 3, padding.top, 6, plotHeight);
-  });
 
   drawSeries(ctx, actualValues, toX, toY, { color: "#2448d6", width: 3, dashed: false });
   drawSeries(ctx, forecastValues, toX, toY, { color: "#0f8c63", width: 3, dashed: true });
@@ -130,7 +135,6 @@ function drawDemandChart(canvas, payload) {
   drawLegend(ctx, [
     { label: "Фактичні продажі", color: "#2448d6", dashed: false },
     { label: "Прогноз", color: "#0f8c63", dashed: true },
-    { label: "Акція", color: "#f59e0b", dashed: false },
     { label: "Початок прогнозу", color: "#7c8fb6", dashed: true, width: 2 },
   ], padding.left, height - 20);
 }
@@ -149,11 +153,11 @@ function drawImportanceChart(canvas, items) {
 
   const data = (items || []).slice(0, 8);
   if (!data.length) return;
-  const padding = { top: 18, right: 18, bottom: 18, left: 130 };
+  const padding = { top: 18, right: 18, bottom: 18, left: 178 };
   const maxValue = Math.max(...data.map((item) => Number(item.importance)), 0.001);
   const barHeight = (height - padding.top - padding.bottom) / data.length - 8;
 
-  ctx.font = "12px 'Segoe UI', sans-serif";
+  ctx.font = "11px 'Segoe UI', sans-serif";
   data.forEach((item, index) => {
     const y = padding.top + index * (barHeight + 8);
     const widthBar = ((width - padding.left - padding.right) * Number(item.importance)) / maxValue;
@@ -162,8 +166,7 @@ function drawImportanceChart(canvas, items) {
     ctx.fillStyle = "#2448d6";
     ctx.fillRect(padding.left, y, widthBar, barHeight);
     ctx.fillStyle = "#10203a";
-    ctx.fillText(item.feature, 8, y + barHeight * 0.7);
-    ctx.fillText(String(item.importance), padding.left + widthBar + 8, y + barHeight * 0.7);
+    ctx.fillText(item.label || item.feature, 8, y + barHeight * 0.7);
   });
 }
 
@@ -198,5 +201,6 @@ async function renderCharts() {
 
 window.addEventListener("DOMContentLoaded", () => {
   setLoadingStates();
+  setFilePickerLabels();
   renderCharts();
 });

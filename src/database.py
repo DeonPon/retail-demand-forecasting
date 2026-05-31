@@ -199,7 +199,7 @@ def import_sales_dataframe(data: pd.DataFrame, filename: str) -> dict:
     result = {
         "rows_count": int(len(data)),
         "products_count": int(data["product_id"].nunique()),
-        "message": f"Імпортовано {int(data['product_id'].nunique())} товарів і {len(data)} записів продажів. Модель готова до перенавчання.",
+        "message": f"Дані продажів завантажено: {int(data['product_id'].nunique())} товарів і {len(data)} записів. Система готова до аналізу.",
     }
     log_import(filename, result["rows_count"], result["products_count"], "success")
     return result

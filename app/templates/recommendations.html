@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Закупівлі | Retail Demand Sense{% endblock %}
+{% block title %}Рекомендації | Retail Demand Sense{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Рекомендації закупівель</p>
-    <h1>Планування поповнення запасів</h1>
-    <p class="page-summary">Система зіставляє прогнозований попит, поточний залишок і страховий запас, щоб підказати, де закупівля потрібна, а де запас уже достатній.</p>
+    <p class="eyebrow">Додатковий аналітичний блок</p>
+    <h1>Рекомендації</h1>
+    <p class="page-summary">Ця сторінка не є основною частиною демонстрації. Вона показує, як прогноз попиту може бути використаний для орієнтовної оцінки потреби товару.</p>
   </div>
   <div class="header-actions">
     <form method="get" class="filters-row compact">
@@ -19,6 +19,12 @@
   </div>
 </header>
 
+<section class="formula-panel formula-panel-soft">
+  <span>Орієнтовна потреба</span>
+  <strong>прогнозований попит − поточний запас</strong>
+  <p>Розрахунок є допоміжним і не замінює бізнес-рішення менеджера.</p>
+</section>
+
 <section class="panel">
   {% if recommendations %}
   <div class="table-responsive">
@@ -27,33 +33,21 @@
         <tr>
           <th>Товар</th>
           <th>Категорія</th>
-          <th>Прогноз</th>
-          <th>Залишок</th>
-          <th>Страховий запас</th>
-          <th>Затримка</th>
-          <th>Закупівля</th>
-          <th>Пріоритет</th>
-          <th>Пояснення</th>
+          <th>Прогноз попиту</th>
+          <th>Поточний запас</th>
+          <th>Орієнтовна потреба</th>
+          <th>Коментар системи</th>
         </tr>
       </thead>
       <tbody>
         {% for item in recommendations %}
         <tr>
-          <td>{{ item.product_icon }} {{ item.product_name }}</td>
+          <td>{{ item.product_name }}</td>
           <td>{{ item.category }}</td>
-          <td>{{ item.forecast_total }}</td>
-          <td>{{ item.current_stock }}</td>
-          <td>{{ item.safety_stock }}</td>
-          <td>{{ item.supplier_delay_days }} дн.</td>
-          <td>{{ item.recommended_order_quantity }}</td>
-          <td>
-            <span class="chip {% if item.priority == 'високий' %}chip-danger{% elif item.priority == 'середній' %}chip-warn{% else %}chip-ok{% endif %}">
-              {{ item.status_label }}
-            </span>
-          </td>
-          <td class="stack-compact">
-            <span>{{ item.explanation }}</span>
-          </td>
+          <td>{{ item.forecast_total }} од.</td>
+          <td>{{ item.current_stock }} од.</td>
+          <td><strong>{{ item.recommended_order_quantity }} од.</strong></td>
+          <td class="explanation-cell">{{ item.explanation }}</td>
         </tr>
         {% endfor %}
       </tbody>

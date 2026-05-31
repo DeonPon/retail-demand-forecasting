@@ -10,9 +10,9 @@
   <body class="login-body">
     <div class="login-shell">
       <section class="login-card panel">
-        <div class="login-brand eyebrow">Дипломний прототип</div>
-        <h1>Вхід до системи прогнозування попиту</h1>
-        <p class="page-summary">Увійдіть під демо-користувачем, щоб переглянути dashboard, прогноз попиту, рекомендації закупівель і метрики моделі.</p>
+        <div class="login-brand eyebrow">Необов'язкова авторизація</div>
+        <h1>Вхід до системи</h1>
+        <p class="page-summary">Основна демонстрація доступна без авторизації. Цей екран залишено як службовий маршрут для документації та перевірки механізму входу.</p>
 
         {% if error %}
         <div class="alert alert-danger">{{ error }}</div>
@@ -21,31 +21,21 @@
         <form method="post" class="stack">
           <label class="stack">
             <span class="form-label">Логін</span>
-            <input class="form-control" type="text" name="username" placeholder="admin" required>
+            <input class="form-control" type="text" name="username" required>
           </label>
           <label class="stack">
             <span class="form-label">Пароль</span>
-            <input class="form-control" type="password" name="password" placeholder="admin123" required>
+            <input class="form-control" type="password" name="password" required>
           </label>
           <button class="btn btn-primary" type="submit" data-loading-text="Виконуємо вхід...">Увійти</button>
+          <a class="btn btn-secondary" href="{{ url_for('dashboard') }}">Перейти до огляду</a>
         </form>
-
-        <div class="demo-access">
-          <span class="chip chip-neutral">demo</span>
-          <span><strong>admin</strong> / <strong>admin123</strong></span>
-        </div>
       </section>
 
       <aside class="login-aside">
         <article class="hero-card">
-          <h2>Що вміє система</h2>
-          <ul class="plain-list">
-            <li>Працює з реалістичним набором ритейл-даних на 74 товари та 12 категорій.</li>
-            <li>Порівнює кілька ML-моделей і автоматично обирає найкращу за MAPE.</li>
-            <li>Пояснює прогноз через фактори попиту, а не лише через числа.</li>
-            <li>Формує рекомендації закупівель з урахуванням запасу та затримки постачання.</li>
-            <li>Підтримує імпорт CSV у SQLite та історію завантажень.</li>
-          </ul>
+          <h2>Retail Demand Sense</h2>
+          <p>ML-система для аналізу історичних продажів, оцінки якості моделі та прогнозування майбутнього попиту на товари.</p>
         </article>
       </aside>
     </div>

@@ -14,24 +14,16 @@
           <img class="brand-logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Retail Demand Sense">
           <div>
             <strong>Retail Demand Sense</strong>
-            <small>Аналітика попиту для ритейлу</small>
+            <small>ML-система прогнозування попиту</small>
           </div>
         </a>
         <nav class="nav-menu">
-          <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
-          <a class="{{ 'active' if request.endpoint == 'products_page' else '' }}" href="{{ url_for('products_page') }}">Товари</a>
+          <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Огляд</a>
+          <a class="{{ 'active' if request.endpoint == 'products_page' else '' }}" href="{{ url_for('products_page') }}">Дані</a>
           <a class="{{ 'active' if request.endpoint == 'forecast_page' else '' }}" href="{{ url_for('forecast_page') }}">Прогноз</a>
-          <a class="{{ 'active' if request.endpoint == 'recommendations_page' else '' }}" href="{{ url_for('recommendations_page') }}">Закупівлі</a>
-          <a class="{{ 'active' if request.endpoint == 'metrics_page' else '' }}" href="{{ url_for('metrics_page') }}">Метрики</a>
+          <a class="{{ 'active' if request.endpoint == 'metrics_page' else '' }}" href="{{ url_for('metrics_page') }}">Модель</a>
           <a class="{{ 'active' if request.endpoint == 'about_page' else '' }}" href="{{ url_for('about_page') }}">Про систему</a>
         </nav>
-        <div class="sidebar-footer">
-          <div>
-            <span class="chip chip-ok">demo access</span>
-            <p>{{ session.get('user', {}).get('username', 'manager') }}</p>
-          </div>
-          <a href="{{ url_for('logout') }}">Вийти</a>
-        </div>
       </aside>
 
       <main class="main-content">

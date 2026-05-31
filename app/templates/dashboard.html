@@ -1,19 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Retail Demand Sense{% endblock %}
+{% block title %}Огляд | Retail Demand Sense{% endblock %}
 {% block content %}
-<header class="page-header">
+<header class="hero-panel hero-dashboard">
   <div>
-    <p class="eyebrow">Аналітична панель</p>
-    <h1>Прогнозування попиту та планування закупівель</h1>
-    <p class="page-summary">Головна сторінка показує бізнес-показники: обсяг каталогу, ризик дефіциту, середній прогноз попиту та товари, які потребують уваги менеджера.</p>
+    <p class="eyebrow">Прогнозування попиту</p>
+    <h1>Інтелектуальна система прогнозування попиту</h1>
+    <p class="page-summary">Система аналізує історичні продажі, формує ознаки для ML-моделі, прогнозує майбутній попит і пояснює фактори, що впливають на результат.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-sm" href="{{ url_for('forecast_page') }}">Побудувати прогноз</a>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('products_page') }}">Перейти до даних</a>
+    </div>
   </div>
-  <div class="header-actions">
-    <form class="upload-form" action="{{ url_for('upload_from_form') }}" method="post" enctype="multipart/form-data">
-      <input class="form-control form-control-sm" type="file" name="file" accept=".csv" required>
-      <button class="btn btn-primary btn-sm" type="submit" data-loading-text="Імпортуємо...">Імпорт CSV</button>
-    </form>
-    <a class="btn btn-secondary btn-sm" href="{{ url_for('download_sample_csv') }}">Приклад CSV</a>
-  </div>
+  <aside class="scenario-card">
+    <h2>Як працює система</h2>
+    <div class="scenario-flow">
+      <div><strong>Аналіз історичних продажів</strong><small>часові ряди продажів по товарах</small></div>
+      <div><strong>Формування ознак</strong><small>календарні та статистичні характеристики</small></div>
+      <div><strong>Навчання ML-моделі</strong><small>порівняння алгоритмів і вибір моделі</small></div>
+      <div><strong>Побудова прогнозу</strong><small>очікуваний попит на майбутній період</small></div>
+      <div><strong>Інтерпретація результату</strong><small>пояснення динаміки та факторів впливу</small></div>
+    </div>
+  </aside>
 </header>
 
 {% if notice %}
@@ -27,143 +34,69 @@
 {% endif %}
 
 <section class="kpi-grid kpi-grid-large">
-  <article class="kpi-card"><span>Товарів</span><strong>{{ overview.products_count }}</strong></article>
+  <article class="kpi-card"><span>Товарів у наборі</span><strong>{{ overview.products_count }}</strong></article>
   <article class="kpi-card"><span>Категорій</span><strong>{{ overview.categories_count }}</strong></article>
   <article class="kpi-card"><span>Записів продажів</span><strong>{{ overview.sales_rows_count }}</strong></article>
-  <article class="kpi-card"><span>Середній прогноз</span><strong>{{ average_forecast }}</strong></article>
-  <article class="kpi-card"><span>Потребують закупівлі</span><strong>{{ products_to_order }}</strong></article>
-  <article class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong></article>
-  <article class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong></article>
-  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong></article>
-  <article class="kpi-card accent"><span>Найкраща модель</span><strong>{{ metrics.get('best_model_name', '—') }}</strong></article>
+  <article class="kpi-card"><span>Прогнозний період</span><strong>14 днів</strong></article>
+  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>середня відносна помилка</p></article>
+</section>
+
+<section class="panel value-panel">
+  <div>
+    <p class="eyebrow">Аналітика попиту</p>
+    <h2>Практичне використання</h2>
+  </div>
+  <p>Прогноз допомагає оцінити майбутній попит, побачити зміну динаміки продажів і підтримати управлінські рішення в ритейлі.</p>
 </section>
 
 <section class="content-grid dashboard-grid">
   <article class="panel chart-panel">
     <div class="panel-heading">
       <div>
-        <h2>{{ forecast.product_name }}</h2>
-        <p>Синя лінія показує фактичні продажі за останні 60 днів, зелена пунктирна — прогноз на наступні 14 днів.</p>
+        <p class="eyebrow">Приклад роботи</p>
+        <h2>Приклад прогнозу попиту</h2>
+        <p>Синя лінія показує історичні продажі, зелена пунктирна — прогноз після останньої дати в наборі даних.</p>
       </div>
-      <form method="get">
+      <form method="get" class="inline-control">
         <select class="form-select form-select-sm" name="product_id" onchange="this.form.submit()">
           {% for product in products %}
-          <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_icon }} {{ product.product_name }}</option>
+          <option value="{{ product.product_id }}" {% if product.product_id == selected_product %}selected{% endif %}>{{ product.product_name }}</option>
           {% endfor %}
         </select>
       </form>
     </div>
     <div class="chart-wrap">
-      <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="14"></canvas>
-      <div id="chartFallback" class="chart-fallback">Графік прогнозу тимчасово недоступний. Показники та таблиці на сторінці залишаються доступними.</div>
+      <canvas id="demandChart" data-chart="demand" data-product-id="{{ selected_product }}" data-days="14" title="Синя лінія показує історичні продажі, зелена пунктирна — прогноз після останньої дати."></canvas>
+      <div id="chartFallback" class="chart-fallback">Графік прогнозу тимчасово недоступний. Текстовий висновок і показники залишаються доступними.</div>
     </div>
+    <p class="chart-note">На головній сторінці показано приклад роботи системи. Детальний прогноз для кожного товару доступний у розділі «Прогноз».</p>
   </article>
 
   <article class="panel side-panel">
-    <h2>Коротке пояснення прогнозу</h2>
-    <p>{{ forecast.plain_explanation }}</p>
-    <div class="info-stack">
-      <div><span class="hint-label">Період прогнозу</span><strong>{{ forecast.forecast_start_date }} — {{ forecast.forecast_end_date }}</strong></div>
-      <div><span class="hint-label">Середній прогноз</span><strong>{{ forecast.forecast_avg }}</strong></div>
-      <div><span class="hint-label">Мін / макс</span><strong>{{ forecast.forecast_min }} / {{ forecast.forecast_max }}</strong></div>
-      <div><span class="hint-label">Рекомендовано закупити</span><strong>{{ recommendation.recommended_order_quantity if recommendation else 0 }} од.</strong></div>
+    <h2>Інтерпретація прогнозу</h2>
+    <p>Для вибраного товару система визначила <strong>{{ forecast.trend_label }}</strong> та сформувала прогноз на 14 днів. Очікуваний сумарний попит становить <strong>{{ forecast.forecast_total }} одиниць</strong>, середній денний попит — <strong>{{ forecast.forecast_avg }} одиниці</strong>.</p>
+    <p class="muted">{{ forecast.trend_note }}</p>
+    <div class="metric-grid">
+      <div><span>Очікуваний попит</span><strong>{{ forecast.forecast_total }} од.</strong></div>
+      <div><span>Середній попит на день</span><strong>{{ forecast.forecast_avg }} од.</strong></div>
+      <div><span>Тип динаміки</span><strong>{{ forecast.trend_label }}</strong></div>
+      <div><span>Період прогнозу</span><strong>{{ forecast.forecast_start_date }} — {{ forecast.forecast_end_date }}</strong></div>
     </div>
-  </article>
-</section>
-
-<section class="tri-grid">
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <h2>Топ 10 товарів для закупівлі</h2>
-        <p>Позиції, де прогнозований попит і страховий запас перевищують поточний залишок.</p>
-      </div>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-hover">
-        <thead><tr><th>Товар</th><th>Оцінка попиту</th><th>Залишок</th><th>Закупити</th></tr></thead>
-        <tbody>
-          {% for item in top_to_buy %}
-          <tr>
-            <td>{{ item.product_icon }} {{ item.product_name }}</td>
-            <td>{{ item.forecast_total }}</td>
-            <td>{{ item.current_stock }}</td>
-            <td><span class="chip chip-danger">{{ item.recommended_order_quantity }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </article>
-
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <h2>Товари з ризиком дефіциту</h2>
-        <p>Позиції з найнижчим покриттям запасу в днях.</p>
-      </div>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-hover">
-        <thead><tr><th>Товар</th><th>Покриття, днів</th><th>Пріоритет</th></tr></thead>
-        <tbody>
-          {% for item in risk_items %}
-          <tr>
-            <td>{{ item.product_icon }} {{ item.product_name }}</td>
-            <td>{{ item.stock_cover_days }}</td>
-            <td><span class="chip {% if item.priority == 'високий' %}chip-danger{% elif item.priority == 'середній' %}chip-warn{% else %}chip-ok{% endif %}">{{ item.priority }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </article>
-
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <h2>Фактори, що вплинули на прогноз</h2>
-        <p>Пояснення попиту в термінах, зрозумілих менеджеру та на захисті дипломної.</p>
-      </div>
-    </div>
-    {% if forecast.factors %}
-    <ul class="plain-list">
-      {% for factor in forecast.factors %}
-      <li>{{ factor }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="empty-state">Фактори прогнозу тимчасово недоступні.</div>
-    {% endif %}
   </article>
 </section>
 
 <section class="panel">
   <div class="panel-heading">
     <div>
-      <h2>Останній імпорт даних</h2>
-      <p>Історія завантажень CSV та результат обробки.</p>
+      <h2>Що робить система</h2>
+      <p>Система проходить повний шлях від історії продажів до пояснюваного прогнозу.</p>
     </div>
   </div>
-  {% if imports %}
-  <div class="table-responsive">
-    <table class="table table-sm">
-      <thead><tr><th>Файл</th><th>Рядків</th><th>Товарів</th><th>Статус</th><th>Дата</th></tr></thead>
-      <tbody>
-        {% for item in imports %}
-        <tr>
-          <td>{{ item.filename }}</td>
-          <td>{{ item.rows_count }}</td>
-          <td>{{ item.products_count }}</td>
-          <td><span class="chip {% if item.status == 'success' %}chip-ok{% else %}chip-danger{% endif %}">{{ item.status }}</span></td>
-          <td>{{ item.imported_at }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="feature-grid feature-grid-strong">
+    <div><span class="feature-icon">01</span><strong>Аналіз історичних продажів</strong><small>Часові ряди по товарах і категоріях.</small></div>
+    <div><span class="feature-icon">02</span><strong>Прогноз майбутнього попиту</strong><small>Значення для дат після останнього факту.</small></div>
+    <div><span class="feature-icon">03</span><strong>Оцінка точності моделі</strong><small>MAE, RMSE і MAPE для тестової вибірки.</small></div>
+    <div><span class="feature-icon">04</span><strong>Пояснення факторів впливу</strong><small>Інтерпретація ознак без сирої технічності.</small></div>
   </div>
-  {% else %}
-  <div class="empty-state">Історія імпортів поки порожня.</div>
-  {% endif %}
 </section>
 {% endblock %}

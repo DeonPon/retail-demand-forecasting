@@ -111,7 +111,7 @@ def save_uploaded_dataset(data: pd.DataFrame, path: Path = DEFAULT_DATA_PATH) ->
     prepared = _apply_default_optional_columns(normalize_legacy_columns(data))
     validate_sales_dataframe(prepared)
     path.parent.mkdir(parents=True, exist_ok=True)
-    prepared.to_csv(path, index=False, encoding="utf-8")
+    prepared.to_csv(path, index=False, encoding="utf-8-sig")
     clear_data_cache()
 
 
@@ -125,6 +125,7 @@ def get_product_catalog(path: Path = DEFAULT_DATA_PATH) -> pd.DataFrame:
         "product_icon",
         "price",
         "stock_quantity",
+        "promo",
         "base_demand",
         "seasonality_type",
         "shelf_life_days",

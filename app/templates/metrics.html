@@ -1,73 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Метрики | Retail Demand Sense{% endblock %}
+{% block title %}Модель | Retail Demand Sense{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
     <p class="eyebrow">Якість моделі</p>
-    <h1>Метрики та автоматичний вибір моделі</h1>
-    <p class="page-summary">Система порівнює кілька алгоритмів і автоматично обирає той, що показує найкращу MAPE на тестових даних.</p>
+    <h1>Оцінка якості моделі</h1>
+    <p class="page-summary">Сторінка пояснює, як оцінювалась якість прогнозування, чому обрано конкретну модель і які фактори найбільше впливають на результат.</p>
   </div>
 </header>
 
-<section class="kpi-grid compact">
-  <article class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong><p>Середня помилка в одиницях товару.</p></article>
-  <article class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong><p>Сильніше реагує на великі помилки прогнозу.</p></article>
-  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>Середня відносна помилка у відсотках.</p></article>
-</section>
-
 <section class="content-grid">
   <article class="panel">
-    <h2>Підсумок навчання</h2>
-    <div class="info-stack">
-      <div><span class="hint-label">Автоматично обрана модель</span><strong>{{ metrics.get('best_model_name', '—') }}</strong></div>
-      <div><span class="hint-label">Train rows</span><strong>{{ metrics.get('train_rows', '—') }}</strong></div>
-      <div><span class="hint-label">Test rows</span><strong>{{ metrics.get('test_rows', '—') }}</strong></div>
-      <div><span class="hint-label">Останнє навчання</span><strong>{{ metrics.get('last_training_at', '—') }}</strong></div>
+    <h2>Як оцінювалась модель</h2>
+    <p>Дані були поділені на навчальну та тестову вибірки. Моделі навчались на історичних записах продажів, після чого якість прогнозу оцінювалась за MAE, RMSE і MAPE.</p>
+    <p>MAPE показує середню відносну похибку прогнозу у відсотках. Менше значення означає точніший прогноз.</p>
+  </article>
+  <article class="panel">
+    <h2>Чому обрана модель ExtraTreesRegressor</h2>
+    <p><strong>{{ metrics.get('best_model_name', 'ExtraTreesRegressor') }}</strong> обрано як основну модель, оскільки вона показала найнижче значення MAPE серед протестованих алгоритмів.</p>
+  </article>
+</section>
+
+<section class="panel interpretation-panel">
+  <h2>Що означають результати</h2>
+  <p>Отримані метрики показують, наскільки прогноз моделі відхиляється від фактичних продажів на тестовій вибірці. MAPE показує середню відносну похибку прогнозу у відсотках. Менше значення означає точніший прогноз.</p>
+  <ul class="plain-list metric-meaning-list">
+    <li><strong>MAE</strong> — середня абсолютна помилка в одиницях товару.</li>
+    <li><strong>RMSE</strong> — метрика, чутлива до великих помилок.</li>
+    <li><strong>MAPE</strong> — середня відносна помилка у відсотках.</li>
+  </ul>
+  <p><strong>MAPE {{ metrics.get('MAPE', '-') }}%</strong> означає, що середня відносна помилка прогнозу становить приблизно {{ metrics.get('MAPE', '-') }}%, що є прийнятним результатом для демонстраційного прототипу з реалістичними коливаннями попиту.</p>
+  <p>Для демонстраційного прототипу отримані метрики є достатніми для показу працездатності підходу прогнозування попиту.</p>
+</section>
+
+<section class="kpi-grid kpi-grid-model">
+  <article class="kpi-card"><span>Обрана модель</span><strong>{{ metrics.get('best_model_name', '—') }}</strong></article>
+  <article class="kpi-card"><span>MAE</span><strong>{{ metrics.get('MAE', '-') }}</strong><p>помилка в одиницях товару</p></article>
+  <article class="kpi-card"><span>RMSE</span><strong>{{ metrics.get('RMSE', '-') }}</strong><p>чутлива до великих помилок</p></article>
+  <article class="kpi-card"><span>MAPE</span><strong>{{ metrics.get('MAPE', '-') }}%</strong><p>помилка у відсотках</p></article>
+  <article class="kpi-card"><span>Навчальні записи</span><strong>{{ metrics.get('train_rows', '—') }}</strong></article>
+  <article class="kpi-card"><span>Тестові записи</span><strong>{{ metrics.get('test_rows', '—') }}</strong></article>
+</section>
+
+<section class="content-grid model-grid">
+  <article class="panel">
+    <h2>Порівняння моделей</h2>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead><tr><th>Модель</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Результат</th></tr></thead>
+        <tbody>
+          {% for item in metrics.get('model_comparison', []) %}
+          <tr>
+            <td>{{ item.model }}</td>
+            <td>{{ item.MAE }}</td>
+            <td>{{ item.RMSE }}</td>
+            <td>{{ item.MAPE }}%</td>
+            <td>
+              {% if item.model == metrics.get('best_model_name') %}
+              <span class="chip chip-ok">найкраща MAPE</span>
+              {% else %}
+              <span class="chip chip-neutral">порівняно</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </article>
 
   <article class="panel">
-    <h2>Важливість ознак</h2>
+    <h2>Топ факторів прогнозу</h2>
     <div class="chart-wrap chart-wrap-small">
-      <canvas id="importanceChart" data-chart="importance" data-importance='{{ metrics.get("feature_importance", []) | tojson }}'></canvas>
+      <canvas id="importanceChart" data-chart="importance" data-importance='{{ human_feature_importance | tojson }}'></canvas>
       <div id="importanceFallback" class="chart-fallback">Список важливих ознак доступний нижче.</div>
     </div>
-    <div class="tag-row">
-      {% for item in metrics.get('feature_importance', []) %}
-      <span class="chip chip-neutral">{{ item.feature }}: {{ item.importance }}</span>
-      {% endfor %}
-    </div>
+    <p class="muted">Найбільший вплив мають ознаки, пов’язані з попередніми продажами. Це логічно для задачі прогнозування попиту, оскільки майбутній попит часто залежить від недавньої динаміки продажів.</p>
   </article>
-</section>
-
-<section class="panel">
-  <h2>Порівняння моделей</h2>
-  <div class="table-responsive">
-    <table class="table table-hover">
-      <thead><tr><th>Модель</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Статус</th></tr></thead>
-      <tbody>
-        {% for item in metrics.get('model_comparison', []) %}
-        <tr>
-          <td>{{ item.model }}</td>
-          <td>{{ item.MAE }}</td>
-          <td>{{ item.RMSE }}</td>
-          <td>{{ item.MAPE }}</td>
-          <td>
-            {% if item.model == metrics.get('best_model_name') %}
-            <span class="chip chip-ok">обрана за найкращою MAPE</span>
-            {% else %}
-            <span class="chip chip-neutral">кандидат</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<section class="panel">
-  <h2>Практичне трактування</h2>
-  <p>MAE показує середню помилку в штуках товару, RMSE сильніше штрафує великі промахи, а MAPE показує, наскільки прогноз відхиляється у відсотках. Для бізнесу це означає, наскільки впевнено можна спиратися на прогноз при плануванні закупівель.</p>
 </section>
 {% endblock %}

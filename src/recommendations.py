@@ -40,22 +40,19 @@ def purchase_recommendation(product_id: int, days: int = 14, persist_forecast: b
         else 1.0
     )
     safety_stock = (mean_demand * (2 + supplier_delay_days) + std_demand * 0.8) * category_factor
-    recommended_order_quantity = max(0, round(forecast_total + safety_stock - current_stock))
+    recommended_order_quantity = max(0, round(forecast_total - current_stock))
     stock_cover_days = current_stock / mean_demand
     priority = _priority_for_recommendation(recommended_order_quantity, stock_cover_days)
 
     if recommended_order_quantity <= 0:
         explanation = (
             f"Прогнозований попит становить {round(forecast_total)} од. за {days} днів. "
-            f"Поточний залишок — {round(current_stock)} од., страховий запас — {round(safety_stock)} од. "
-            f"Поточних запасів достатньо, тому додаткова закупівля не потрібна."
+            f"Поточний запас — {round(current_stock)} од. За цією оцінкою додаткова потреба не формується."
         )
     else:
         explanation = (
             f"Прогнозований попит становить {round(forecast_total)} од. за {days} днів. "
-            f"Поточний залишок — {round(current_stock)} од., страховий запас — {round(safety_stock)} од., "
-            f"затримка постачальника — {supplier_delay_days:.0f} дн. "
-            f"Система рекомендує закупити {recommended_order_quantity} од."
+            f"Поточний запас — {round(current_stock)} од. Орієнтовна потреба за прогнозом — {recommended_order_quantity} од."
         )
 
     return {
