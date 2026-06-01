@@ -1,4 +1,4 @@
-date,product_id,product_name,category,sales_quantity,price,stock_quantity,promo,holiday,supplier_delay_days,product_icon,base_demand,seasonality_type,shelf_life_days,supplier_name,region
+﻿date,product_id,product_name,category,sales_quantity,price,stock_quantity,promo,holiday,supplier_delay_days,product_icon,base_demand,seasonality_type,shelf_life_days,supplier_name,region
 2024-05-01,1,Рис довгозернистий 1 кг,Бакалія,23,68.41,251,0,0,0,🌾,24,stable,365,AgroTrade LLC,Київ
 2024-05-02,1,Рис довгозернистий 1 кг,Бакалія,26,68.71,225,0,0,1,🌾,24,stable,365,AgroTrade LLC,Київ
 2024-05-03,1,Рис довгозернистий 1 кг,Бакалія,22,68.51,203,0,0,0,🌾,24,stable,365,AgroTrade LLC,Київ
